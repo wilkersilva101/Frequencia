@@ -7,7 +7,14 @@ module Admin
     UNIDADE_PILOTO_ID = 110_001_469
 
     def index
-      @frequentadores = params[:inativos].present? ? User.all : User.ativos
+      if params[:status_filtro].present?
+        @frequentadores = User.where(status: params[:status_filtro])
+      elsif params[:inativos].present?
+        @frequentadores = User.all
+      else
+        @frequentadores = User.ativos
+      end
+
       @frequentadores = @frequentadores.includes(:frequentador_cache).order(:nome_completo)
 
       if params[:nome].present?
@@ -27,6 +34,8 @@ module Admin
       if params[:orgao].present?
         @frequentadores = @frequentadores.joins(:frequentador_cache).where("frequentador_caches.orgao ILIKE ?", "%#{params[:orgao]}%")
       end
+
+      @frequentadores = @frequentadores.page(params[:page])
     end
 
     def reimportar_dados_pessoa
