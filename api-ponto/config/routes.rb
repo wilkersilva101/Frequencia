@@ -1,6 +1,20 @@
 Rails.application.routes.draw do
   get "up" => "rails/health#show", as: :rails_health_check
 
+  # Configurações do Sistema — painéis web de monitoramento (Exception Track
+  # e Sidekiq) montados como Rack apps isolados e protegidos pelo constraint
+  # de administrador (sessão `_api_ponto_session` + `User#admin?`). Ver
+  # PRD-CONFIGURACOES-SISTEMA.md e lib/admin_constraint.rb.
+  #
+  # NOTE (Sidekiq): o projeto usa Solid Queue (sem Redis) por decisão
+  # registrada no PRD §16. O Sidekiq::Web é servido aqui para monitoramento;
+  # a troca do queue_adapter (Solid Queue -> Sidekiq) NÃO é feita nesta PRD
+  # (ver D01 no PRD-CONFIGURACOES-SISTEMA.md).
+  mount ExceptionTrack::Engine => "/exception-track", constraints: AdminConstraint.new
+
+  require "sidekiq/web"
+  mount Sidekiq::Web => "/sidekiq", constraints: AdminConstraint.new
+
   # Admin frontend (R.2 — controllers vivem em Admin::, paths preservados via
   # `module:` para não quebrar login_path/dashboard_path/users_path/etc.
   # já usados pelos testes e pelas views — ver ADR-001, Seção 4)

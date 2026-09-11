@@ -1,0 +1,35 @@
+<%# Item de navegação "Configurações do Sistema" (sidebar AdminLTE).
+    #
+    # Adicionado em PRD-CONFIGURACOES-SISTEMA.md. Exibido apenas para
+    # administradores (os painéis de monitoramento — Exception Track e
+    # Sidekiq::Web — são Rack apps isolados protegidos pelo `AdminConstraint`
+    # em config/routes.rb, então mesmo que o link apareça, o acesso sem a
+    # sessão admin retorna 404/redirect via constraint).
+    #
+    # Paths: /exception-track (ExceptionTrack::Engine) e /sidekiq
+    # (Sidekiq::Web). Ver PRD-CONFIGURACOES-SISTEMA.md §5. %>
+<% if current_user&.admin? %>
+  <li class="nav-item">
+    <a href="#" class="nav-link">
+      <i class="nav-icon bi bi-gear"></i>
+      <p>
+        Configurações do Sistema
+        <i class="nav-arrow bi bi-chevron-right"></i>
+      </p>
+    </a>
+    <ul class="nav nav-treeview">
+      <li class="nav-item">
+        <%= link_to "/exception-track", class: "nav-link#{" active" if request.path.start_with?("/exception-track") }" do %>
+          <i class="nav-icon bi bi-bug"></i>
+          <p>Exception Track</p>
+        <% end %>
+      </li>
+      <li class="nav-item">
+        <%= link_to "/sidekiq", class: "nav-link#{" active" if request.path.start_with?("/sidekiq") }" do %>
+          <i class="nav-icon bi bi-diagram-3"></i>
+          <p>Sidekiq</p>
+        <% end %>
+      </li>
+    </ul>
+  </li>
+<% end %>

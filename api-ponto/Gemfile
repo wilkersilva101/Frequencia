@@ -41,6 +41,19 @@ gem "stimulus-rails"
 # Pagination
 gem "kaminari"
 
+# Monitoramento de erros da aplicação (Exception Track) — painel web para
+# visualizar exceções registradas no banco (Rails/ActiveRecord; sem mongo).
+gem "exception-track"
+
+# Painel de monitoramento de background jobs (Configurações do Sistema).
+#
+# NOTE: o projeto usa Solid Queue (sem Redis) por decisão registrada no
+# PRD §16. O Sidekiq é adicionado para a tela de monitoramento/gestão
+# (Sidekiq::Web); a config padrão segue Solid Queue
+# (config.active_job.queue_adapter) e NÃO é alterada aqui — ver D01 no
+# PRD-CONFIGURACOES-SISTEMA.md.
+gem "sidekiq"
+
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 # gem "rack-cors"
 
