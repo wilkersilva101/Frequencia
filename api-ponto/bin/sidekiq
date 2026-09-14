@@ -1,0 +1,4 @@
+#!/usr/bin/env ruby
+# Inicia o worker do Sidekiq para processamento de background jobs.
+# Fila configurada em config/sidekiq.yml; agendamento em config/schedule.yml.
+exec "bundle", "exec", "sidekiq", "-C", "config/sidekiq.yml", *ARGV

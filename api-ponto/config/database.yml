@@ -44,6 +44,30 @@ test:
   <<: *default
   database: api_ponto_test
 
+# ── Conexão (somente leitura) com o MySQL legado da Intranet TJPI ────────
+# Usada exclusivamente pelos jobs de sincronização de digitais (e, futuramente,
+# outros dados). O padrão segue o Pessoas2 (docs/JOB-sync-predios.md):
+#   - intranet_development: credenciais literais, apenas em development.
+#   - intranet_production:  credenciais via variáveis de ambiente (INTRANET_*).
+# A api-ponto NEVER escreve neste banco — `Intranet::SyncDigitaisService`
+# executa apenas SELECT sobre `presenca_frequentador`.
+intranet_development:
+  adapter: mysql2
+  encoding: utf8mb4
+  pool: 5
+  host: 10.254.3.6
+  port: 3306
+  username: intranet
+  password: intranet!@#info
+  database: intranet
+
+intranet_production:
+  adapter: mysql2
+  encoding: utf8mb4
+  pool: 5
+  # Credenciais fornecidas via variáveis de ambiente (ver Intranet::SyncDigitaisService) —
+  # os campos aqui ficam vazios; o serviço aplica ENV.fetch em time de execução.
+
 # As with config/credentials.yml, you never want to store sensitive information,
 # like your database password, in your source code. If your source code is
 # ever seen by anyone, they now have access to your database.

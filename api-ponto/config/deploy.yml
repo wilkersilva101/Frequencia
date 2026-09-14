@@ -8,10 +8,13 @@ image: your-user/api_ponto
 servers:
   web:
     - 192.168.0.1
+  # Worker de background jobs (Sidekiq). Ver config/sidekiq.yml e
+  # config/schedule.yml. Ative este bloco quando tiver um host dedicado
+  # a jobs, ou rode a fila junto com o web (SOLID_QUEUE_IN_PUMA foi removido).
   # job:
   #   hosts:
   #     - 192.168.0.1
-  #   cmd: bin/jobs
+  #   cmd: bin/sidekiq
 
 # Enable SSL auto certification via Let's Encrypt and allow for multiple apps on a single web server.
 # Remove this section when using multiple web servers and ensure you terminate SSL at your load balancer.
@@ -36,12 +39,13 @@ env:
   secret:
     - RAILS_MASTER_KEY
   clear:
-    # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
-    # When you start using multiple servers, you should split out job processing to a dedicated machine.
-    SOLID_QUEUE_IN_PUMA: true
+    # Background jobs rodam via Sidekiq (com Redis). Em single-server, rode o
+    # worker Sidekiq junto ao web; em múltiplos servers, use a role `job`
+    # (ver secão `servers`). O Redis deve estar acessível via REDIS_URL.
+    # REDIS_URL: redis://api_ponto-redis:6379/0
 
-    # Set number of processes dedicated to Solid Queue (default: 1)
-    # JOB_CONCURRENCY: 3
+    # Number of Sidekiq workers/threads
+    # SIDEKIQ_CONCURRENCY: 10
 
     # Set number of cores available to the application on each server (default: 1).
     # WEB_CONCURRENCY: 2

@@ -1,0 +1,14 @@
+# Configuration for Sidekiq (background jobs).
+# Ativado via `bundle exec sidekiq -C config/sidekiq.yml`.
+---
+:verbose: false
+:concurrency: 5
+:timeout: 30
+
+:queues:
+  - default
+  - critical
+
+# you can override concurrency based on environment
+production:
+  :concurrency: 10

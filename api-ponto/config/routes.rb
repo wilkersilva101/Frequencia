@@ -6,10 +6,9 @@ Rails.application.routes.draw do
   # de administrador (sessão `_api_ponto_session` + `User#admin?`). Ver
   # PRD-CONFIGURACOES-SISTEMA.md e lib/admin_constraint.rb.
   #
-  # NOTE (Sidekiq): o projeto usa Solid Queue (sem Redis) por decisão
-  # registrada no PRD §16. O Sidekiq::Web é servido aqui para monitoramento;
-  # a troca do queue_adapter (Solid Queue -> Sidekiq) NÃO é feita nesta PRD
-  # (ver D01 no PRD-CONFIGURACOES-SISTEMA.md).
+  # NOTE (Sidekiq): o projeto migrou de Solid Queue para Sidekiq (com Redis).
+  # O Sidekiq::Web monitora os jobs reais; o agendamento recorrente usa
+  # `sidekiq-cron` (config/schedule.yml). Ver PRD-CONFIGURACOES-SISTEMA.md.
   mount ExceptionTrack::Engine => "/exception-track", constraints: AdminConstraint.new
 
   require "sidekiq/web"

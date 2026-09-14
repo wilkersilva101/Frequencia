@@ -1,0 +1,29 @@
+# config/schedule.yml
+#
+# Carregado automaticamente pelo `sidekiq-cron` no boot do worker Sidekiq
+# (via require-time hook). Os jobs agendados só são registrados em produção
+# para não disparar sozinhos em dev/test. Padrão do pessoas2.
+<% if Rails.env.production? %>
+
+# Espelha os dados do sistema Pessoas (nome completo) nos Users com CPF
+importar_dados_pessoa:
+  cron: "0 0 * * *"
+  class: "ImportarDadosPessoaJob"
+  queue: default
+
+# Sincroniza afastamentos (Direitos/Deveres) da Sticapi
+sincronizar_afastamentos:
+  cron: "5 0 * * *"
+  class: "SincronizarAfastamentosJob"
+  queue: default
+
+# Sincroniza as digitais (biometria) da Intranet para a api-ponto.
+# Modelo: sync_predios_job do Pessoas2 (docs/JOB-sync-predios.md).
+sync_digitais:
+  cron: "0 3 * * *"
+  class: "SyncDigitaisJob"
+  queue: default
+
+<% else %>
+{}
+<% end %>

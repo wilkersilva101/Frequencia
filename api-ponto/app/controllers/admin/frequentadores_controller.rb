@@ -7,6 +7,12 @@ module Admin
     UNIDADE_PILOTO_ID = 110_001_469
 
     def index
+      # Resumo do espelhamento de digitais da Intranet (SyncDigitaisService).
+      # Opção A (só exibição): contamos os usuários com digital preenchida para
+      # mostrar no topo da listagem. Não há campo de origem no schema — a coluna
+      # `users.digitais_hash` é populada exclusivamente pelo job de sync.
+      @total_com_digitais = User.com_digitais.count
+
       if params[:status_filtro].present?
         @frequentadores = User.where(status: params[:status_filtro])
       elsif params[:inativos].present?
