@@ -2,6 +2,8 @@ module Admin
   class SessionsController < Admin::ApplicationController
     skip_before_action :require_login, only: [:new, :create]
     skip_before_action :verify_authenticity_token, only: [:create]
+    # Task 23.7 — Login/sessão não requer autorização CanCanCan.
+    skip_authorization_check
 
     def new
       if logged_in?

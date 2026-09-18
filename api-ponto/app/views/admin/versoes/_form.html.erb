@@ -1,0 +1,32 @@
+<%= form_with(model: @versao, url: url, local: true) do |f| %>
+  <% if @versao.errors.any? %>
+    <div class="alert alert-danger">
+      <h6><%= pluralize(@versao.errors.count, "erro") %> ao salvar:</h6>
+      <ul class="mb-0">
+        <% @versao.errors.full_messages.each do |msg| %>
+          <li><%= msg %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <%= f.label :numero, "Versão", class: "form-label" %>
+    <%= f.text_field :numero, class: "form-control", autofocus: true, placeholder: "Ex.: 1.2.0" %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :novidades, "Novidades", class: "form-label" %>
+    <%= f.text_area :novidades, class: "form-control", rows: 5 %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :link, "Link", class: "form-label" %>
+    <%= f.text_field :link, class: "form-control", placeholder: "https://..." %>
+  </div>
+
+  <div class="d-flex gap-2">
+    <%= f.submit submit_label, class: "btn btn-primary" %>
+    <%= link_to "Cancelar", versoes_path, class: "btn btn-outline-secondary" %>
+  </div>
+<% end %>

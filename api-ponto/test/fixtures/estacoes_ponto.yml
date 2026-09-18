@@ -1,0 +1,23 @@
+one:
+  descricao: "Estacao Recepcao Terreo"
+  versao: "1.0.0"
+  ultimo_contato: <%= 1.hour.ago %>
+  vnc: "10.150.1.10:5900"
+  anydesk: "123 456 789"
+  teamviewer: "987 654 321"
+  observacao: "Estacao de testes"
+  cod_ativacao: "poc-ativacao-001"
+  created_at: <%= Time.now %>
+  updated_at: <%= Time.now %>
+
+two:
+  descricao: "Estacao Almoxarifado"
+  versao: "1.0.0"
+  ultimo_contato: <%= 2.days.ago %>
+  vnc: "10.150.1.11:5900"
+  anydesk: "111 222 333"
+  teamviewer: "444 555 666"
+  observacao: "Estacao de testes"
+  cod_ativacao: "poc-ativacao-002"
+  created_at: <%= Time.now %>
+  updated_at: <%= Time.now %>

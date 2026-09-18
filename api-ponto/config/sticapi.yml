@@ -1,0 +1,37 @@
+# Configuração de acesso à API Sticapi (sistema Pessoas), consumida via gem
+# `sticapi_client` (ver app/jobs/importar_dados_pessoa_job.rb).
+#
+# Diferente do config/sticapi.yml do Pessoas2 (senha em texto puro, versionada
+# no repositório), aqui a credencial fica em Rails encrypted credentials
+# (config/credentials.yml.enc, protegido por config/master.key — não vai para
+# o git). É a mesma credencial já usada pelo Pessoas2 (usuário
+# pessoas@sticapps.tjpi), reaproveitada a pedido do usuário — ver risco
+# registrado em SPRINT-PLAN.md (Sprint 8, task 8.2): a mesma senha agora
+# existe em dois repositórios; considerar credencial dedicada no futuro.
+#
+# ENV continua como fallback (útil para sobrescrever em CI/deploy sem tocar
+# nas credentials).
+#
+# ATENÇÃO: a gem sticapi_client (>= 4.x) lê ENV["STICAPI_HOST"] diretamente
+# (SticapiClient#load_config) — se essa variável estiver setada no processo,
+# a gem ignora este arquivo por completo (nem chega a ler credentials). Isso
+# é um comportamento da própria gem, não deste YAML.
+default: &default
+  host: <%= ENV["STICAPI_HOST"] || Rails.application.credentials.dig(:sticapi, :host) %>
+  urn: api
+  port: <%= ENV["STICAPI_PORT"] || Rails.application.credentials.dig(:sticapi, :port) || 443 %>
+  user: <%= ENV["STICAPI_USER"] || Rails.application.credentials.dig(:sticapi, :user) %>
+  ssl: <%= ENV["STICAPI_SSL"] ? ENV["STICAPI_SSL"] == "true" : Rails.application.credentials.dig(:sticapi, :ssl) %>
+  password: <%= ENV["STICAPI_PASSWORD"] || Rails.application.credentials.dig(:sticapi, :password) %>
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+  host: "sticapi.test"
+  user: "test-user"
+  password: "test-password"
+
+production:
+  <<: *default

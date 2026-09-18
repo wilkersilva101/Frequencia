@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-bs-theme="light">
+<html lang="pt-BR" data-bs-theme="light" data-controller="theme">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,9 +14,6 @@
 
   <!-- Fonts -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/source-sans-3@5.0.12/index.css" crossorigin="anonymous" media="print" onload="this.media='all'" />
-
-  <!-- Bootstrap Icons -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" crossorigin="anonymous" />
 
   <!-- AdminLTE 4 -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0/dist/css/adminlte.min.css" crossorigin="anonymous" />
@@ -36,13 +33,21 @@
       <!-- Left navbar links -->
       <ul class="navbar-nav">
         <li class="nav-item">
-          <a class="nav-link" data-lte-toggle="sidebar" href="#" role="button" aria-label="Toggle sidebar">
-            <i class="bi bi-list"></i>
+          <a
+            class="nav-link"
+            data-lte-toggle="sidebar"
+            data-controller="sidebar"
+            data-action="click->sidebar#toggle"
+            href="#"
+            role="button"
+            aria-label="Toggle sidebar"
+          >
+            <i class="fas fa-bars"></i>
           </a>
         </li>
         <li class="nav-item d-none d-md-block">
           <%= link_to root_path, class: "nav-link" do %>
-            <i class="bi bi-grid-1x2 me-1" aria-hidden="true"></i>
+            <i class="fas fa-table-cells me-1" aria-hidden="true"></i>
             Dashboard
           <% end %>
         </li>
@@ -50,6 +55,30 @@
 
       <!-- Right navbar links -->
       <ul class="navbar-nav ms-auto">
+        <li class="nav-item dropdown">
+          <a
+            class="nav-link dropdown-toggle"
+            data-bs-toggle="dropdown"
+            href="#"
+            role="button"
+            aria-expanded="false"
+            aria-label="Alternar tema"
+            title="Alternar tema"
+          >
+            <i class="fas fa-sun" data-theme-target="icon"></i>
+          </a>
+          <div class="dropdown-menu dropdown-menu-end" data-bs-popper="static">
+            <button class="dropdown-item d-flex align-items-center gap-2" data-action="theme#pick" data-theme-mode-param="light">
+              <i class="fas fa-sun"></i> Claro
+            </button>
+            <button class="dropdown-item d-flex align-items-center gap-2" data-action="theme#pick" data-theme-mode-param="dark">
+              <i class="fas fa-moon"></i> Escuro
+            </button>
+            <button class="dropdown-item d-flex align-items-center gap-2" data-action="theme#pick" data-theme-mode-param="auto">
+              <i class="fas fa-circle-half-stroke"></i> Automático
+            </button>
+          </div>
+        </li>
         <% if session[:user_id] %>
           <li class="nav-item dropdown user-menu">
             <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" aria-label="Menu do usuário">
@@ -86,63 +115,63 @@
         <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" data-accordion="false">
           <li class="nav-item">
             <%= link_to dashboard_path, class: "nav-link#{" active" if current_page?(dashboard_path) || current_page?(root_path) }" do %>
-              <i class="nav-icon bi bi-speedometer"></i>
+              <i class="nav-icon fas fa-gauge"></i>
               <p>Dashboard</p>
             <% end %>
           </li>
           <li class="nav-item">
             <%= link_to time_records_path, class: "nav-link#{" active" if current_page?(time_records_path) }" do %>
-              <i class="nav-icon bi bi-clock-history"></i>
+              <i class="nav-icon fas fa-clock-rotate-left"></i>
               <p>Registros de Ponto</p>
             <% end %>
           </li>
           <% if current_user&.admin? %>
             <li class="nav-item">
               <%= link_to users_path, class: "nav-link#{" active" if current_page?(users_path) }" do %>
-                <i class="nav-icon bi bi-people"></i>
+                <i class="nav-icon fas fa-users"></i>
                 <p>Usuários</p>
               <% end %>
             </li>
           <% end %>
           <li class="nav-item">
             <a href="#" class="nav-link">
-              <i class="nav-icon bi bi-person-check"></i>
+              <i class="nav-icon fas fa-user-check"></i>
               <p>
                 Presença
-                <i class="nav-arrow bi bi-chevron-right"></i>
+                <i class="nav-arrow fas fa-chevron-right"></i>
               </p>
             </a>
             <ul class="nav nav-treeview">
               <li class="nav-item">
                 <%= link_to frequentadores_path, class: "nav-link#{" active" if current_page?(frequentadores_path) }" do %>
-                  <i class="nav-icon bi bi-circle"></i>
+                  <i class="nav-icon fas fa-circle"></i>
                   <p>Frequentadores</p>
                 <% end %>
               </li>
               <li class="nav-item">
                 <a href="#" class="nav-link">
-                  <i class="nav-icon bi bi-circle"></i>
+                  <i class="nav-icon fas fa-circle"></i>
                   <p>
                     Estação de Ponto
-                    <i class="nav-arrow bi bi-chevron-right"></i>
+                    <i class="nav-arrow fas fa-chevron-right"></i>
                   </p>
                 </a>
                 <ul class="nav nav-treeview">
                   <li class="nav-item">
                     <a href="#" class="nav-link">
-                      <i class="nav-icon bi bi-circle"></i>
+                      <i class="nav-icon fas fa-circle"></i>
                       <p>Inicializar Estação</p>
                     </a>
                   </li>
                   <li class="nav-item">
                     <%= link_to estacoes_path, class: "nav-link#{" active" if current_page?(estacoes_path) }" do %>
-                      <i class="nav-icon bi bi-circle"></i>
+                      <i class="nav-icon fas fa-circle"></i>
                       <p>Explorar Estações</p>
                     <% end %>
                   </li>
                   <li class="nav-item">
                     <%= link_to versoes_path, class: "nav-link#{" active" if current_page?(versoes_path) }" do %>
-                      <i class="nav-icon bi bi-circle"></i>
+                      <i class="nav-icon fas fa-circle"></i>
                       <p>Explorar Versões</p>
                     <% end %>
                   </li>
@@ -150,28 +179,28 @@
               </li>
               <li class="nav-item">
                 <a href="#" class="nav-link">
-                  <i class="nav-icon bi bi-circle"></i>
+                  <i class="nav-icon fas fa-circle"></i>
                   <p>
                     Relatório Mensal
-                    <i class="nav-arrow bi bi-chevron-right"></i>
+                    <i class="nav-arrow fas fa-chevron-right"></i>
                   </p>
                 </a>
                 <ul class="nav nav-treeview">
                   <li class="nav-item">
                     <%= link_to relatorio_terceirizados_path, class: "nav-link#{" active" if current_page?(relatorio_terceirizados_path) }" do %>
-                      <i class="nav-icon bi bi-circle"></i>
+                      <i class="nav-icon fas fa-circle"></i>
                       <p>Relatório Terceirizados</p>
                     <% end %>
                   </li>
                   <li class="nav-item">
                     <%= link_to frequencia_por_orgao_path, class: "nav-link#{" active" if current_page?(frequencia_por_orgao_path) }" do %>
-                      <i class="nav-icon bi bi-circle"></i>
+                      <i class="nav-icon fas fa-circle"></i>
                       <p>Frequência por Órgão</p>
                     <% end %>
                   </li>
                   <li class="nav-item">
                     <%= link_to parcial_path, class: "nav-link#{" active" if current_page?(parcial_path) }" do %>
-                      <i class="nav-icon bi bi-circle"></i>
+                      <i class="nav-icon fas fa-circle"></i>
                       <p>Parcial</p>
                     <% end %>
                   </li>
@@ -179,25 +208,25 @@
               </li>
               <li class="nav-item">
                 <%= link_to frequencia_path, class: "nav-link#{" active" if current_page?(frequencia_path) }" do %>
-                  <i class="nav-icon bi bi-circle"></i>
+                  <i class="nav-icon fas fa-circle"></i>
                   <p>Frequência</p>
                 <% end %>
               </li>
               <li class="nav-item">
                 <%= link_to regimes_path, class: "nav-link#{" active" if current_page?(regimes_path) }" do %>
-                  <i class="nav-icon bi bi-circle"></i>
+                  <i class="nav-icon fas fa-circle"></i>
                   <p>Regimes</p>
                 <% end %>
               </li>
               <li class="nav-item">
                 <%= link_to direitos_deveres_path, class: "nav-link#{" active" if current_page?(direitos_deveres_path) }" do %>
-                  <i class="nav-icon bi bi-circle"></i>
+                  <i class="nav-icon fas fa-circle"></i>
                   <p>Direitos &amp; Deveres</p>
                 <% end %>
               </li>
               <li class="nav-item">
                 <%= link_to gestores_individuais_path, class: "nav-link#{" active" if current_page?(gestores_individuais_path) }" do %>
-                  <i class="nav-icon bi bi-circle"></i>
+                  <i class="nav-icon fas fa-circle"></i>
                   <p>Gestores Individuais</p>
                 <% end %>
               </li>
@@ -262,6 +291,12 @@
 <%= javascript_importmap_tags "application" %>
 
 <script>
+// NOTA (task 24.8): a persistência de estado da sidebar abaixo foi portada para
+// app/javascript/controllers/sidebar_controller.js (Stimulus), conectado ao mesmo botão
+// [data-lte-toggle="sidebar"] logo acima (data-controller="sidebar"). Este bloco inline ficou
+// redundante, mas foi mantido de propósito — a remoção é escopo da task 25.5 (ver Sprint 24).
+// Não há conflito funcional: ambos usam a mesma chave de localStorage ("admin-sidebar-collapsed")
+// e a mesma semântica de espelhar a classe `sidebar-collapse` do <body>.
 document.addEventListener('DOMContentLoaded', function() {
   // Sidebar state persistence
   var savedState = localStorage.getItem('admin-sidebar-collapsed');

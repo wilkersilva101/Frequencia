@@ -37,6 +37,27 @@ class PresencaEndpointsTest < ActionDispatch::IntegrationTest
     assert_equal "USUARIO_SENHA_INVALIDOS", @response.body
   end
 
+  test "GET ValidarFrequentador accepts codAtivacao of a registered EstacaoPonto (Task 1.4)" do
+    estacao = estacoes_ponto(:two)
+    get presenca_ValidarFrequentador_url(
+      loginAccessKey: @username_enc,
+      plainPassword: @password_enc,
+      codAtivacao: estacao.cod_ativacao
+    )
+    assert_response :success
+    assert_equal @user.id.to_s, @response.body
+  end
+
+  test "GET ValidarFrequentador accepts the unsupported-OS sentinel codAtivacao (Task 1.4)" do
+    get presenca_ValidarFrequentador_url(
+      loginAccessKey: @username_enc,
+      plainPassword: @password_enc,
+      codAtivacao: "SistemaOperacionalNaoSuportado"
+    )
+    assert_response :success
+    assert_equal @user.id.to_s, @response.body
+  end
+
   test "GET ValidarFrequentador returns error for wrong activation code" do
     get presenca_ValidarFrequentador_url(
       loginAccessKey: @username_enc,
@@ -208,13 +229,58 @@ class PresencaEndpointsTest < ActionDispatch::IntegrationTest
     assert_match(/não cadastrada/, foto["motivo"])
   end
 
-  test "POST SincronizarRegistrosPonto accepts any codAtivacao (PoC)" do
-    registros = "1-15:07:2026:14:30:45"
+  test "POST SincronizarRegistrosPonto returns sincronizado without persisting for unregistered codAtivacao (Task 1.4)" do
+    registros = "#{@user.id}-15:07:2026:14:30:45"
     enc = CryptoDes.encrypt(registros)
     post presenca_ajax_SincronizarRegistrosPonto_url,
       params: { registros: enc, codAtivacao: "invalid" }
     assert_response :success
     assert_equal "sincronizado", @response.body
+    assert_equal 0, TimeRecord.count
+  end
+
+  test "POST SincronizarRegistrosPonto accepts codAtivacao of a registered EstacaoPonto (Task 1.4)" do
+    estacao = estacoes_ponto(:two)
+    registros = "#{@user.id}-15:07:2026:14:30:45"
+    enc = CryptoDes.encrypt(registros)
+    post presenca_ajax_SincronizarRegistrosPonto_url,
+      params: { registros: enc, codAtivacao: estacao.cod_ativacao }
+    assert_response :success
+    assert_equal "sincronizado", @response.body
+    assert_equal 1, TimeRecord.where(raw_data: registros).count
+  end
+
+  test "POST SincronizarRegistrosPonto accepts the unsupported-OS sentinel codAtivacao (Task 1.4)" do
+    registros = "#{@user.id}-15:07:2026:14:30:45"
+    enc = CryptoDes.encrypt(registros)
+    post presenca_ajax_SincronizarRegistrosPonto_url,
+      params: { registros: enc, codAtivacao: "SistemaOperacionalNaoSuportado" }
+    assert_response :success
+    assert_equal "sincronizado", @response.body
+    assert_equal 1, TimeRecord.where(raw_data: registros).count
+  end
+
+  test "POST SincronizarRegistrosPonto associa o TimeRecord a EstacaoPonto real (Sprint 13, task 13.1)" do
+    estacao = estacoes_ponto(:two)
+    registros = "#{@user.id}-15:07:2026:14:30:45"
+    enc = CryptoDes.encrypt(registros)
+    post presenca_ajax_SincronizarRegistrosPonto_url,
+      params: { registros: enc, codAtivacao: estacao.cod_ativacao }
+    assert_response :success
+
+    record = TimeRecord.find_by(raw_data: registros)
+    assert_equal estacao, record.estacao_ponto
+  end
+
+  test "POST SincronizarRegistrosPonto com sentinela de OS nao suportado nao associa EstacaoPonto (sem linha real correspondente)" do
+    registros = "#{@user.id}-15:07:2026:14:30:45"
+    enc = CryptoDes.encrypt(registros)
+    post presenca_ajax_SincronizarRegistrosPonto_url,
+      params: { registros: enc, codAtivacao: "SistemaOperacionalNaoSuportado" }
+    assert_response :success
+
+    record = TimeRecord.find_by(raw_data: registros)
+    assert_nil record.estacao_ponto
   end
 
   test "POST SincronizarRegistrosPonto handles invalid DES data gracefully (default plain text)" do

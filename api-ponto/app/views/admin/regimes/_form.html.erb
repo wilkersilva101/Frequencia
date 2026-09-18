@@ -1,0 +1,43 @@
+<%= form_with(model: @regime, url: url, local: true) do |f| %>
+  <% if @regime.errors.any? %>
+    <div class="alert alert-danger">
+      <h6><%= pluralize(@regime.errors.count, "erro") %> ao salvar:</h6>
+      <ul class="mb-0">
+        <% @regime.errors.full_messages.each do |msg| %>
+          <li><%= msg %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <%= f.label :nome, class: "form-label" %>
+    <%= f.text_field :nome, class: "form-control", autofocus: true %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :categorias, "Categorias", class: "form-label" %>
+    <%= f.select :categorias, options_for_select(Regime::CATEGORIAS_DISPONIVEIS.map { |c| [ Regime::CATEGORIAS_LABELS[c], c ] }, @regime.categorias), { }, { class: "form-select", multiple: true, size: Regime::CATEGORIAS_DISPONIVEIS.size } %>
+    <div class="form-text">Um regime pode valer para mais de uma categoria (Ctrl/Cmd+clique para selecionar várias).</div>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :modalidade, class: "form-label" %>
+    <%= f.select :modalidade, options_for_select(Regime::MODALIDADES_DISPONIVEIS.map { |m| [ Regime::MODALIDADES_LABELS[m], m ] }, @regime.modalidade), { include_blank: true }, { class: "form-select" } %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :resumo, class: "form-label" %>
+    <%= f.text_area :resumo, class: "form-control", rows: 3 %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :meta_semanal, "Meta Semanal", class: "form-label" %>
+    <%= f.text_field :meta_semanal, class: "form-control", placeholder: "Ex.: 40h" %>
+  </div>
+
+  <div class="d-flex gap-2">
+    <%= f.submit submit_label, class: "btn btn-primary" %>
+    <%= link_to "Cancelar", regimes_path, class: "btn btn-outline-secondary" %>
+  </div>
+<% end %>

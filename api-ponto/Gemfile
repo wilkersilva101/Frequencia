@@ -12,6 +12,13 @@ gem "puma", ">= 5.0"
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 gem "bcrypt", "~> 3.1.7"
 
+# Sprint 23, task 23.3 — Framework de autenticação Devise (substitui, ao
+# final da transição, o has_secure_password local; a autenticação via
+# Pessoas2/CPF é preservada no model User). Já presente no bundle como
+# dependência transitiva do sticapi_client (devise >= 4.3) — mesma versão
+# 5.0.x usada pelo basic8 (app de referência do merge).
+gem "devise", "~> 5.0"
+
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]
 
@@ -38,8 +45,29 @@ gem "thruster", require: false
 gem "turbo-rails"
 gem "stimulus-rails"
 
+# Pagination
+gem "kaminari"
+
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 # gem "rack-cors"
+
+# Sprint 23, task 23.4 — Gerenciamento de roles (autorização). Fornece
+# `has_role?`, `add_role`, `with_role` no model User e `scopify` no
+# model Role. Necessária para a integração com CanCanCan (task 23.5+).
+# basic8 usa a mesma gem (mesma versão ~6.0, compatível com Rails 8.x).
+gem "rolify", "~> 6.0"
+
+# Sprint 23, task 23.5 — Autorização declarativa baseada em abilities
+# (CanCanCan). Necessária para mapear permissões por role
+# (admin/gestor/operador) em `app/models/ability.rb`, que será integrada
+# aos controllers na task 23.7. A mesma gem usada pelo basic8
+# (app de referência, Rails 8.1 — cancancan 3.6.1, compatível com Rails 8.x).
+gem "cancancan", "~> 3.6"
+
+# Client oficial para consumir a API Sticapi (dados cadastrais do sistema
+# Pessoas). Mesma gem já usada no Pessoas2 para espelhar dados de outros
+# sistemas do TJPI — reuso evita reimplementar autenticação/HTTP.
+gem "sticapi_client"
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem

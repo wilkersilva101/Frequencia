@@ -4,11 +4,16 @@
   <div class="col-sm-6">
     <p class="text-muted mb-0"><%= @estacoes.size %> estação(ões)</p>
   </div>
+  <div class="col-sm-6 text-sm-end">
+    <%= link_to new_estacao_path, class: "btn btn-primary" do %>
+      <i class="fas fa-plus me-1"></i> Nova Estação
+    <% end %>
+  </div>
 </div>
 
 <div class="card card-primary card-outline">
   <div class="card-header">
-    <h3 class="card-title"><i class="bi bi-hdd-network me-1"></i> Lista de Estações</h3>
+    <h3 class="card-title"><i class="fas fa-network-wired me-1"></i> Lista de Estações</h3>
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
@@ -22,7 +27,7 @@
             <th>AnyDesk</th>
             <th>TeamViewer</th>
             <th>Observação</th>
-            <th class="text-end">Editar</th>
+            <th class="text-end">Ações</th>
           </tr>
         </thead>
         <tbody>
@@ -31,14 +36,21 @@
               <td><%= estacao[:descricao] %></td>
               <td><%= estacao[:versao] %></td>
               <td><%= estacao[:ultimo_contato] %></td>
-              <td><%= estacao[:vnc] %></td>
+              <td>
+                <% if estacao.vnc_ip.present? %>
+                  <%= link_to estacao.vnc_ip, "vnc://#{estacao.vnc_ip}" %>
+                <% end %>
+              </td>
               <td><%= estacao[:anydesk] %></td>
               <td><%= estacao[:teamviewer] %></td>
               <td><%= estacao[:observacao] %></td>
               <td class="text-end">
                 <div class="d-flex gap-1 justify-content-end">
-                  <%= link_to "#", class: "btn btn-xs btn-outline-primary" do %>
-                    <i class="bi bi-pencil"></i>
+                  <%= link_to edit_estacao_path(estacao), class: "btn btn-xs btn-outline-primary" do %>
+                    <i class="fas fa-pencil"></i>
+                  <% end %>
+                  <%= button_to estacao_path(estacao), method: :delete, class: "btn btn-xs btn-outline-danger", data: { turbo_confirm: "Tem certeza que deseja excluir esta estação?" } do %>
+                    <i class="fas fa-trash"></i>
                   <% end %>
                 </div>
               </td>

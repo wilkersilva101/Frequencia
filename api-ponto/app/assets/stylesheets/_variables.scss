@@ -1,0 +1,177 @@
+// ============================================================
+// 🎨 Tema personalizado: Frequência (Admin Moderno)
+// Cor principal: #2563eb (azul vibrante)
+// Portado de basic8/app/assets/stylesheets/_variables.scss (Sprint 24.1)
+// Nomes de variável conferidos contra admin-lte@4.0.0 real
+// (node_modules/admin-lte/src/scss/_variables.scss e _variables-dark.scss)
+// ============================================================
+
+
+// ------------------------------------------------------------
+// 🔵 PALETA PRINCIPAL
+// ------------------------------------------------------------
+$primary: #2563eb;
+
+$secondary: #6b7280;
+$success: #22c55e;
+$info: #0ea5e9;
+$warning: #f59e0b;
+$danger: #e11d48;
+$light: #f1f5f9;
+$dark: #111827;
+
+
+// ------------------------------------------------------------
+// 🧱 CORPO E TEXTO
+// ------------------------------------------------------------
+$body-bg: #ffffff;
+$body-color: #1f2937;
+$border-color: #e5e7eb;
+
+
+// ------------------------------------------------------------
+// 🔗 LINKS
+// ------------------------------------------------------------
+$link-color: $primary;
+$link-decoration: none;
+$link-hover-color: darken($primary, 12%);
+$link-hover-decoration: underline;
+
+
+// ------------------------------------------------------------
+// 🔘 BOTÕES
+// ------------------------------------------------------------
+$btn-border-radius: 0.375rem;
+$btn-padding-y: 0.525rem;
+$btn-padding-x: 1.1rem;
+
+$btn-hover-bg-shade-amount: 10%;
+$btn-active-bg-shade-amount: 15%;
+
+$btn-outline-primary-color: $primary;
+$btn-outline-primary-border-color: $primary;
+$btn-outline-primary-hover-bg: rgba($primary, 0.08);
+
+
+// ------------------------------------------------------------
+// 🔳 FORMULÁRIOS
+// ------------------------------------------------------------
+$form-check-input-checked-bg-color: $primary;
+$form-check-input-checked-border-color: $primary;
+
+$input-focus-border-color: $primary;
+$input-focus-box-shadow: 0 0 0 .25rem rgba($primary, .22);
+
+$input-border-color: #cbd5e1;
+$input-bg: #ffffff;
+$input-placeholder-color: #9ca3af;
+
+
+// ------------------------------------------------------------
+// 🧭 NAVBAR (modo dark)
+// ------------------------------------------------------------
+$navbar-dark-color: rgba(#fff, 0.55);
+$navbar-dark-hover-color: #ffffff;
+$navbar-dark-active-color: #ffffff;
+$navbar-dark-bg: $primary;
+
+
+// ------------------------------------------------------------
+// 🧱 SIDEBAR (AdminLTE v4 — tema claro)
+// Variáveis conferidas em node_modules/admin-lte/src/scss/_variables.scss
+// ------------------------------------------------------------
+$lte-sidebar-hover-bg: rgba($secondary, 0.1);
+$lte-sidebar-color: $body-color;
+$lte-sidebar-hover-color: $secondary;
+$lte-sidebar-active-color: $secondary;
+$lte-sidebar-menu-active-bg: $secondary;
+$lte-sidebar-menu-active-color: #ffffff;
+$lte-sidebar-submenu-bg: transparent;
+$lte-sidebar-submenu-color: $body-color;
+$lte-sidebar-submenu-hover-color: $secondary;
+$lte-sidebar-submenu-hover-bg: rgba($secondary, 0.08);
+$lte-sidebar-submenu-active-color: #ffffff;
+$lte-sidebar-submenu-active-bg: $secondary;
+$lte-sidebar-header-color: rgba($body-color, 0.5);
+
+// ------------------------------------------------------------
+// 🧱 SIDEBAR — MODO ESCURO
+// Variáveis conferidas em node_modules/admin-lte/src/scss/_variables-dark.scss
+// ------------------------------------------------------------
+$lte-sidebar-hover-bg-dark: rgba(255, 255, 255, 0.1);
+$lte-sidebar-color-dark: #c2c7d0;
+$lte-sidebar-hover-color-dark: #ffffff;
+$lte-sidebar-active-color-dark: #ffffff;
+$lte-sidebar-menu-active-bg-dark: $secondary;
+$lte-sidebar-menu-active-color-dark: #ffffff;
+$lte-sidebar-submenu-bg-dark: transparent;
+$lte-sidebar-submenu-color-dark: #c2c7d0;
+$lte-sidebar-submenu-hover-color-dark: #ffffff;
+$lte-sidebar-submenu-hover-bg-dark: rgba(255, 255, 255, 0.05);
+$lte-sidebar-submenu-active-color-dark: #ffffff;
+$lte-sidebar-submenu-active-bg-dark: $secondary;
+$lte-sidebar-header-color-dark: rgba(255, 255, 255, 0.5);
+
+
+// ------------------------------------------------------------
+// 🧩 PAGINAÇÃO
+// ------------------------------------------------------------
+$pagination-color: $primary;
+$pagination-hover-color: #fff;
+$pagination-hover-bg: darken($primary, 10%);
+$pagination-hover-border-color: darken($primary, 10%);
+
+$pagination-active-bg: $primary;
+$pagination-active-border-color: $primary;
+
+$pagination-bg: #ffffff;
+$pagination-border-color: #e5e7eb;
+
+
+// ------------------------------------------------------------
+// 📢 ALERTAS
+// ------------------------------------------------------------
+$alert-primary-bg: rgba($primary, 0.1);
+$alert-primary-border-color: rgba($primary, 0.25);
+$alert-primary-color: $primary;
+
+$alert-success-bg: rgba($success, 0.1);
+$alert-success-color: $success;
+
+$alert-danger-bg: rgba($danger, 0.1);
+$alert-danger-color: $danger;
+
+
+// ------------------------------------------------------------
+// 🔤 TIPOGRAFIA
+// ------------------------------------------------------------
+$font-family-sans-serif: "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
+$headings-color: $dark;
+$headings-font-weight: 600;
+
+$font-size-base: 0.96rem;
+$line-height-base: 1.48;
+
+
+// ------------------------------------------------------------
+// 🧩 TABELAS
+// ------------------------------------------------------------
+$table-th-font-weight: 600;
+$table-striped-bg: #f6f6f7;
+$table-hover-bg: #f1f5f9;
+
+
+// ------------------------------------------------------------
+// 🧱 CARDS
+// ------------------------------------------------------------
+$card-border-color: #e5e7eb;
+$card-cap-bg: #f8fafc;
+$card-bg: #ffffff;
+
+
+// ------------------------------------------------------------
+// ✨ SOMBRAS
+// ------------------------------------------------------------
+$box-shadow-sm: 0 1px 2px rgba(0, 0, 0, .05);
+$box-shadow: 0 2px 4px rgba(0, 0, 0, .08);
+$box-shadow-lg: 0 8px 20px rgba(0, 0, 0, .12);

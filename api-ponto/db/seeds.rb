@@ -1,6 +1,48 @@
+# Sprint 23, task 23.9 — DECISÃO: `status: 1` NÃO foi migrado para Devise
+# `confirmed_at`. Investigado antes de decidir:
+#   - O model `User` (app/models/user.rb) habilita apenas
+#     `:database_authenticatable, :registerable, :recoverable, :rememberable,
+#     :validatable, :trackable` — o módulo `:confirmable` NÃO está na lista.
+#   - Não existe coluna `confirmed_at` no schema (`db/schema.rb`) nem na
+#     migration `20260910000000_add_devise_to_users.rb` (task 23.1), que é
+#     explicitamente aditiva e documenta as colunas criadas — `confirmed_at`
+#     não é uma delas.
+#   - `status` continua sendo o mecanismo REAL de "ativo/inativo": usado no
+#     scope `User.ativos` (`where(status: 1)`) e em
+#     `active_for_authentication?` (`super && status == 1`, task 23.6), que é
+#     o guard efetivo de login via Devise. Migrar/duplicar esse sinal para
+#     `confirmed_at` sem o módulo `:confirmable` ativo não teria efeito algum
+#     no fluxo de autenticação (Devise só verifica `confirmed_at` quando
+#     `:confirmable` está incluso) — seria apenas uma coluna inerte, e
+#     arriscaria (se `:confirmable` fosse ativado no futuro sem migração de
+#     dados correspondente) bloquear login de usuários existentes com
+#     `status: 1` mas `confirmed_at: nil`.
+# Conclusão: manter `status` como fonte de verdade de "ativo" (sem alteração
+# nesta task). Se o produto decidir adotar confirmação de e-mail via Devise
+# no futuro, isso exige uma nova migration (`add_confirmable_to_users` com
+# `confirmed_at`/`confirmation_token`/etc.), habilitar `:confirmable` no
+# model, e um plano explícito de backfill de `confirmed_at` a partir de
+# `status: 1` — decisão arquitetural fora do escopo desta task (seeds).
+#
+# Sprint 23, task 23.4 — Roles padrão do sistema (idempotentes).
+# Criadas ANTES dos users para que possam ser atribuídas abaixo.
+admin_role  = Role.find_or_create_by!(name: "admin")
+gestor_role = Role.find_or_create_by!(name: "gestor")
+operador_role = Role.find_or_create_by!(name: "operador")
+
+puts "Roles criadas: #{[ admin_role, gestor_role, operador_role ].map(&:name).join(', ')}"
+
 # Admin (username: admin.admin)
 User.find_or_create_by!(nome_completo: "Admin Admin") do |u|
   u.password = "123456"
+end
+
+# Sprint 23, task 23.4 — Atribui role admin ao usuário admin.
+# `add_role` lança erro se já existe, então verificamos primeiro.
+admin_user = User.find_by(nome_completo: "Admin Admin")
+if admin_user && !admin_user.has_role?(:admin)
+  admin_user.add_role(:admin)
+  puts "Role 'admin' atribuída ao usuário Admin Admin"
 end
 
 # Usuários de demonstração

@@ -21,12 +21,32 @@ default: &default
 
 
 development:
-  <<: *default
-  database: api_ponto_development
-  username: postgres
-  password: "1234"
-  host: 10.150.110.174
-  port: 5000
+  primary:
+    <<: *default
+    database: api_ponto_development
+    username: postgres
+    password: "1234"
+    host: 10.150.110.174
+    port: 5000
+  # Conexão somente-leitura ao banco do Pessoas (Postgres) — substitui as
+  # chamadas via Sticapi (gem `sticapi_client`/HTTP). Usuário `app.frequencia`
+  # criado no Postgres do Pessoas com GRANT apenas de SELECT (sem INSERT/
+  # UPDATE/DELETE) — ver `app/models/pessoas_record.rb`. Credenciais em
+  # Rails encrypted credentials (`Rails.application.credentials.pessoas_db`),
+  # nunca em texto puro.
+  pessoas:
+    <<: *default
+    database: <%= Rails.application.credentials.dig(:pessoas_db, :database) %>
+    username: <%= Rails.application.credentials.dig(:pessoas_db, :username) %>
+    password: <%= Rails.application.credentials.dig(:pessoas_db, :password) %>
+    host: <%= Rails.application.credentials.dig(:pessoas_db, :host) %>
+    port: <%= Rails.application.credentials.dig(:pessoas_db, :port) %>
+    # Banco de outra aplicação (Pessoas), lido só via SELECT — o Frequencia
+    # nunca gerencia schema dele (sem migrations, sem schema_migrations
+    # próprio aqui). Sem isso, `rails db:test:prepare`/checagem de pending
+    # migrations tenta criar `schema_migrations` nesse banco e falha com
+    # "permission denied for schema public" (usuário só tem GRANT SELECT).
+    database_tasks: false
 
   # Schema search path. The server defaults to $user,public
   #schema_search_path: myapp,sharedapp,public
@@ -41,8 +61,19 @@ development:
 # re-generated from your development database when you run "rake".
 # Do not set this db to the same as development or production.
 test:
-  <<: *default
-  database: api_ponto_test
+  primary:
+    <<: *default
+    database: api_ponto_test
+  # Mesmo padrão do development — em test, aponta pro pessoas_test local
+  # (mesma convenção do config/database.yml do próprio Pessoas2).
+  pessoas:
+    <<: *default
+    database: pessoas_test
+    username: <%= Rails.application.credentials.dig(:pessoas_db, :username) %>
+    password: <%= Rails.application.credentials.dig(:pessoas_db, :password) %>
+    host: <%= Rails.application.credentials.dig(:pessoas_db, :host) %>
+    port: <%= Rails.application.credentials.dig(:pessoas_db, :port) %>
+    database_tasks: false
 
 # As with config/credentials.yml, you never want to store sensitive information,
 # like your database password, in your source code. If your source code is
@@ -78,3 +109,16 @@ production:
     <<: *primary_production
     database: api_ponto_production_queue
     migrations_paths: db/queue_migrate
+  pessoas:
+    <<: *default
+    database: <%= Rails.application.credentials.dig(:pessoas_db, :database) %>
+    username: <%= Rails.application.credentials.dig(:pessoas_db, :username) %>
+    password: <%= Rails.application.credentials.dig(:pessoas_db, :password) %>
+    host: <%= Rails.application.credentials.dig(:pessoas_db, :host) %>
+    port: <%= Rails.application.credentials.dig(:pessoas_db, :port) %>
+    # Banco de outra aplicação (Pessoas), lido só via SELECT — o Frequencia
+    # nunca gerencia schema dele (sem migrations, sem schema_migrations
+    # próprio aqui). Sem isso, `rails db:test:prepare`/checagem de pending
+    # migrations tenta criar `schema_migrations` nesse banco e falha com
+    # "permission denied for schema public" (usuário só tem GRANT SELECT).
+    database_tasks: false

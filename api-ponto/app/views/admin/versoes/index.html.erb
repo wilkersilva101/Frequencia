@@ -1,17 +1,19 @@
 <% content_for :page_title, "Versões da Estação de Ponto" %>
-<% content_for :page_actions do %>
-  <%= link_to "Cadastrar Nova Versão", "#" %>
-<% end %>
 
 <div class="row mb-3">
   <div class="col-sm-6">
     <p class="text-muted mb-0"><%= @versoes.size %> versão(ões)</p>
   </div>
+  <div class="col-sm-6 text-sm-end">
+    <%= link_to new_versao_path, class: "btn btn-primary" do %>
+      <i class="fas fa-plus me-1"></i> Cadastrar Nova Versão
+    <% end %>
+  </div>
 </div>
 
 <div class="card card-primary card-outline">
   <div class="card-header">
-    <h3 class="card-title"><i class="bi bi-tags me-1"></i> Lista de Versões</h3>
+    <h3 class="card-title"><i class="fas fa-tags me-1"></i> Lista de Versões</h3>
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
@@ -21,18 +23,33 @@
             <th>Versão</th>
             <th>Novidades</th>
             <th>Link</th>
+            <th>Gerência</th>
           </tr>
         </thead>
         <tbody>
           <% @versoes.each do |versao| %>
             <tr>
-              <td><%= versao[:versao] %></td>
-              <td><%= versao[:novidades] %></td>
-              <td><%= versao[:link] %></td>
+              <td><%= versao.numero %></td>
+              <td><%= versao.novidades %></td>
+              <td>
+                <% if versao.link.present? %>
+                  <%= link_to versao.link, versao.link, target: "_blank", rel: "noopener" %>
+                <% end %>
+              </td>
+              <td class="text-end">
+                <div class="d-flex gap-1 justify-content-end">
+                  <%= link_to edit_versao_path(versao), class: "btn btn-xs btn-outline-primary" do %>
+                    <i class="fas fa-pencil"></i>
+                  <% end %>
+                  <%= button_to versao_path(versao), method: :delete, class: "btn btn-xs btn-outline-danger", data: { turbo_confirm: "Tem certeza que deseja excluir esta versão?" } do %>
+                    <i class="fas fa-trash"></i>
+                  <% end %>
+                </div>
+              </td>
             </tr>
           <% end %>
           <% if @versoes.empty? %>
-            <tr><td colspan="3" class="text-muted text-center">Nenhuma versão cadastrada</td></tr>
+            <tr><td colspan="4" class="text-muted text-center">Nenhuma versão cadastrada</td></tr>
           <% end %>
         </tbody>
       </table>

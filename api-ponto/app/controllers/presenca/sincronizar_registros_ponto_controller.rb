@@ -20,9 +20,21 @@ module Presenca
     # punched_at próprio, e não pode ser descartada.
 
     def create
-      unless params[:codAtivacao].present? && %w[poc-ativacao-001 SistemaOperacionalNaoSuportado].include?(params[:codAtivacao])
+      # Sprint 1 (Task 1.4): antes validava contra uma whitelist hardcoded de
+      # códigos de ativação; agora valida contra estações reais cadastradas
+      # em `EstacaoPonto` (mesma resposta/formato do protocolo, apenas a
+      # fonte do dado mudou — ver ADR-0003).
+      unless EstacaoPonto.codigo_ativacao_valido?(params[:codAtivacao])
         return render plain: "sincronizado"
       end
+
+      # Sprint 13 (task 13.1): guarda de qual estação veio o lote, pra grid
+      # admin/frequencia poder exibir a coluna "Estação". `find_by` (não
+      # `find_by!`) porque o sentinela de OS não suportado é válido no
+      # `codigo_ativacao_valido?` acima mas não corresponde a uma linha
+      # real — nesse caso `estacao_ponto` fica nil, e o `TimeRecord` grava
+      # sem esse vínculo (coluna nullable).
+      estacao_ponto = EstacaoPonto.find_by("lower(cod_ativacao) = ?", params[:codAtivacao].to_s.downcase)
 
       registros_raw = params[:registros].to_s
       registros_decrypted = decrypt_registros(registros_raw)
@@ -96,7 +108,8 @@ module Presenca
           punch_type: punch_type,
           # Sprint R (R.5): auditoria — true quando o valor veio do payload,
           # false quando foi inferido pelo PunchTypeService (fallback ADR-08).
-          punch_type_explicit: punch_type_is_explicit
+          punch_type_explicit: punch_type_is_explicit,
+          estacao_ponto: estacao_ponto
         )
 
         registros_aceitos << {

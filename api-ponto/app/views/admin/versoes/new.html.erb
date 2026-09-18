@@ -1,0 +1,14 @@
+<% content_for :page_title, "Nova Versão" %>
+
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="card card-primary card-outline">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-tags me-1"></i> Nova Versão</h3>
+      </div>
+      <div class="card-body">
+        <%= render "form", url: versoes_path, submit_label: "Criar" %>
+      </div>
+    </div>
+  </div>
+</div>

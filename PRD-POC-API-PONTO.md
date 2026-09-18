@@ -650,3 +650,23 @@ api-ponto/
 6. ✅ Executar teste de ponta a ponta: cadastro → autenticação → batida → sincronização
 7. ⏳ Validar com estação JavaFX real (requer ambiente Windows ou Docker com X11)
 8. ⏳ Testar reconhecimento biométrico com leitor Nitgen
+9. 📋 Integrar com o sistema Pessoas via Sticapi (ver §16)
+
+---
+
+## 16. Integração com o Sistema Pessoas (Sticapi)
+
+**Objetivo:** Eliminar o cadastro manual do Frequentador, espelhando seus dados a partir do sistema Pessoas (fonte de verdade de dados cadastrais do TJPI), seguindo o mesmo padrão de integração já usado no sistema Pessoas2.
+
+**Padrão de referência (Pessoas2):** o Pessoas2 acessa outros sistemas do tribunal (Pessoas, GestoRH, Intranet, AD, PJe, etc.) através da gem `sticapi_client`, que expõe um client autenticado (`Sticapi::SticapiClient`, singleton com token renovável via `POST /auth/sign_in`) e módulos de domínio por sistema-fonte (ex: `SticapiClient::Pessoas.get_by_cpf`). Os dados nunca são consultados ao vivo pela tela — são espelhados localmente via job (`Sidekiq`, no caso do Pessoas2), acionado tanto por agendamento quanto por um botão na tela de listagem que dispara o mesmo job (`ImportarUnidadesJob.perform_at`, ver `unidades_controller.rb`).
+
+**Adaptação para o Frequencia:**
+- O Frequencia usa Rails 8 com `solid_queue` (não Sidekiq) — o padrão de job dedicado + lock será adaptado para essa fila, sem depender de Redis.
+- O Frequencia não usa Devise; a gem `sticapi_client` traz Devise como dependência transitiva (por causa da autenticação de sessão do Pessoas2), mas o Frequencia não vai utilizar essa parte da gem — apenas os módulos de client HTTP (ex: `SticapiClient::Pessoas`).
+- Novo campo `cpf` em `users`, como chave de vínculo entre o Frequentador local e o registro correspondente no Pessoas.
+
+**Gatilhos de sincronização:** igual ao padrão do Pessoas2 — **automático**, via Solid Queue recurring (`config/recurring.yml`), rodando diariamente à meia-noite; e **manual**, via botão "Reimportar do Pessoas" na tela de frequentadores, que agenda o mesmo job sob demanda (ex.: cadastro urgente feito no Pessoas durante o dia). Mesmo mecanismo de dois gatilhos usado no plano de integração cadastral mais amplo do Frequencia (`SPRINT-PLAN.md`, Parte 2, Sprints 10 e 12).
+
+**Estratégia:** incremental. A primeira fase (Sprint 8, ver `SPRINT-PLAN.md`) entrega apenas a fundação: gem instalada, autenticação funcionando, campo `cpf`, job de importação com os dois gatilhos (automático + manual). Cada campo adicional do Pessoas a ser espelhado (nome completo, situação funcional, lotação etc.) será avaliado e implementado em sprints subsequentes, sob demanda — não faz parte do escopo inicial.
+
+**Fora de escopo da PoC original:** esta integração não estava prevista no PRD original (v1.0) nem no `SPRINT-PLAN.md` até a Sprint 7. Trata-se de uma extensão de escopo solicitada posteriormente.
