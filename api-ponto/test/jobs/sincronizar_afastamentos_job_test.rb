@@ -1,18 +1,36 @@
 require "test_helper"
 
 class SincronizarAfastamentosJobTest < ActiveJob::TestCase
-  def stub_afastamentos(resposta)
-    SticapiClient::Intranet.define_singleton_method(:afastamentos) { |*_args| resposta }
-    yield
-  ensure
-    SticapiClient::Intranet.singleton_class.remove_method(:afastamentos)
+  # Sem dados reais no banco `pessoas` de teste (sem schema carregado, ver
+  # nota em test/jobs/importar_dados_pessoa_job_test.rb) — stubamos
+  # `Pessoas::Pessoa.find_by`, cuja pessoa devolvida expõe `.afastamentos`
+  # no formato usado pelo job (id_intranet, tipo_afastamento.nome, inicio,
+  # fim).
+  PessoaDouble = Struct.new(:id, :afastamentos, keyword_init: true)
+  AfastamentoDouble = Struct.new(:id_intranet, :tipo_afastamento, :inicio, :fim, keyword_init: true)
+  TipoAfastamentoDouble = Struct.new(:nome, keyword_init: true)
+
+  def afastamento_double(id_intranet:, tipo:, inicio:, fim:)
+    AfastamentoDouble.new(
+      id_intranet: id_intranet,
+      tipo_afastamento: tipo ? TipoAfastamentoDouble.new(nome: tipo) : nil,
+      inicio: Date.parse(inicio),
+      fim: Date.parse(fim)
+    )
   end
 
-  test "faz upsert de AfastamentoCache a partir do retorno da Sticapi" do
+  def stub_pessoa_com_afastamentos(afastamentos)
+    Pessoas::Pessoa.define_singleton_method(:find_by) { |*_args| PessoaDouble.new(id: 1, afastamentos: afastamentos) }
+    yield
+  ensure
+    Pessoas::Pessoa.singleton_class.remove_method(:find_by)
+  end
+
+  test "faz upsert de AfastamentoCache a partir dos afastamentos lidos do banco" do
     user = User.create!(nome_completo: "Fulano", password: "123456", cpf: "11122233344")
 
-    stub_afastamentos([
-      { "id" => 42, "afastamento" => "Férias", "inicio" => "2026-01-10", "fim" => "2026-01-20" }
+    stub_pessoa_com_afastamentos([
+      afastamento_double(id_intranet: 42, tipo: "Férias", inicio: "2026-01-10", fim: "2026-01-20")
     ]) do
       SincronizarAfastamentosJob.perform_now(user.id)
     end
@@ -28,9 +46,9 @@ class SincronizarAfastamentosJobTest < ActiveJob::TestCase
   test "faz upsert de multiplos afastamentos do mesmo usuario" do
     user = User.create!(nome_completo: "Fulano", password: "123456", cpf: "11122233344")
 
-    stub_afastamentos([
-      { "id" => 1, "afastamento" => "Férias", "inicio" => "2026-01-10", "fim" => "2026-01-20" },
-      { "id" => 2, "afastamento" => "Licença Médica", "inicio" => "2026-02-01", "fim" => "2026-02-05" }
+    stub_pessoa_com_afastamentos([
+      afastamento_double(id_intranet: 1, tipo: "Férias", inicio: "2026-01-10", fim: "2026-01-20"),
+      afastamento_double(id_intranet: 2, tipo: "Licença Médica", inicio: "2026-02-01", fim: "2026-02-05")
     ]) do
       SincronizarAfastamentosJob.perform_now(user.id)
     end
@@ -42,8 +60,8 @@ class SincronizarAfastamentosJobTest < ActiveJob::TestCase
     user = User.create!(nome_completo: "Fulano", password: "123456", cpf: "11122233344")
     AfastamentoCache.create!(afastamento_id_pessoas: 42, cpf: "11122233344", tipo: "Tipo Antigo")
 
-    stub_afastamentos([
-      { "id" => 42, "afastamento" => "Tipo Novo", "inicio" => "2026-01-10", "fim" => "2026-01-20" }
+    stub_pessoa_com_afastamentos([
+      afastamento_double(id_intranet: 42, tipo: "Tipo Novo", inicio: "2026-01-10", fim: "2026-01-20")
     ]) do
       SincronizarAfastamentosJob.perform_now(user.id)
     end
@@ -52,10 +70,10 @@ class SincronizarAfastamentosJobTest < ActiveJob::TestCase
     assert_equal "Tipo Novo", AfastamentoCache.find_by(afastamento_id_pessoas: 42).tipo
   end
 
-  test "nao quebra quando a Sticapi nao retorna afastamentos" do
+  test "nao quebra quando a pessoa nao tem afastamentos" do
     user = User.create!(nome_completo: "Fulano", password: "123456", cpf: "11122233344")
 
-    stub_afastamentos([]) do
+    stub_pessoa_com_afastamentos([]) do
       assert_nothing_raised { SincronizarAfastamentosJob.perform_now(user.id) }
     end
 
@@ -66,12 +84,12 @@ class SincronizarAfastamentosJobTest < ActiveJob::TestCase
     sem_cpf = User.create!(nome_completo: "Sem CPF", password: "123456")
     chamou = false
 
-    SticapiClient::Intranet.define_singleton_method(:afastamentos) { |*_args| chamou = true; [] }
+    Pessoas::Pessoa.define_singleton_method(:find_by) { |*_args| chamou = true; nil }
 
     begin
       SincronizarAfastamentosJob.perform_now
     ensure
-      SticapiClient::Intranet.singleton_class.remove_method(:afastamentos)
+      Pessoas::Pessoa.singleton_class.remove_method(:find_by)
     end
 
     assert_not chamou
@@ -82,16 +100,18 @@ class SincronizarAfastamentosJobTest < ActiveJob::TestCase
     user1 = User.create!(nome_completo: "Vai Falhar", password: "123456", cpf: "11122233344")
     user2 = User.create!(nome_completo: "Vai Funcionar", password: "123456", cpf: "55566677788")
 
-    SticapiClient::Intranet.define_singleton_method(:afastamentos) do |cpf:|
+    pessoa_ok = PessoaDouble.new(id: 2, afastamentos: [ afastamento_double(id_intranet: 99, tipo: "Férias", inicio: "2026-01-10", fim: "2026-01-20") ])
+
+    Pessoas::Pessoa.define_singleton_method(:find_by) do |cpf:|
       raise "falha simulada" if cpf == "11122233344"
 
-      [ { "id" => 99, "afastamento" => "Férias", "inicio" => "2026-01-10", "fim" => "2026-01-20" } ]
+      pessoa_ok
     end
 
     begin
       assert_nothing_raised { SincronizarAfastamentosJob.perform_now }
     ensure
-      SticapiClient::Intranet.singleton_class.remove_method(:afastamentos)
+      Pessoas::Pessoa.singleton_class.remove_method(:find_by)
     end
 
     assert_equal 0, AfastamentoCache.where(cpf: user1.cpf).count
@@ -107,11 +127,11 @@ class SincronizarAfastamentosJobTest < ActiveJob::TestCase
     begin
       outra_conexao.exec("SELECT pg_try_advisory_lock(#{SincronizarAfastamentosJob::LOCK_KEY})")
 
-      SticapiClient::Intranet.define_singleton_method(:afastamentos) { |*_args| chamou = true; [] }
+      Pessoas::Pessoa.define_singleton_method(:find_by) { |*_args| chamou = true; nil }
       begin
         SincronizarAfastamentosJob.perform_now(user.id)
       ensure
-        SticapiClient::Intranet.singleton_class.remove_method(:afastamentos)
+        Pessoas::Pessoa.singleton_class.remove_method(:find_by)
       end
 
       assert_not chamou

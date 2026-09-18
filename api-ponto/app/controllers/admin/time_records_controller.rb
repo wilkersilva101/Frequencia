@@ -1,8 +1,14 @@
 module Admin
   class TimeRecordsController < Admin::ApplicationController
+    include DuracaoFormatavel
+
     PER_PAGE = 50
 
     def index
+      # Task 23.7 — CanCanCan: autorização explícita para leitura de registros.
+      # Admin/gestor/operador podem visualizar (todos têm :read em :all).
+      # Gestor também pode gerenciar TimeRecord, mas index é apenas leitura.
+      authorize! :read, :all
       # Anos disponíveis pro dropdown de filtro — do ano do registro mais
       # antigo até o ano atual (nunca futuro). Sem registros ainda, mostra
       # só o ano atual.
@@ -16,7 +22,15 @@ module Admin
       # ignorando qualquer filtro de usuário vindo dos params.
       if current_user.admin?
         if params[:usuario].present?
-          usuarios_encontrados = User.where("nome_completo ILIKE ?", "%#{params[:usuario]}%")
+          # Mesmo filtro/fonte do "Nome" em admin/frequentadores (pedido do
+          # usuário, 2026-09-02): busca por nome via vínculo ativo do
+          # pessoas2 (Pessoas::Vinculo.cpfs_por_nome), não pelo
+          # `nome_completo` local nem pela tabela `pessoas` crua (que
+          # incluiria gente com vínculo encerrado). Só retorna quem já tem
+          # User local (TimeRecord só existe pra quem já bateu ponto, e
+          # bater ponto exige User local).
+          cpfs_encontrados = Pessoas::Vinculo.cpfs_por_nome(params[:usuario])
+          usuarios_encontrados = User.where(cpf: cpfs_encontrados)
           registros = registros.where(user_id: usuarios_encontrados.select(:id))
 
           # Só entra no modo "um usuário só" (com o card de resumo mensal)
@@ -116,13 +130,6 @@ module Admin
         total_segundos += (saida.punched_at - entrada.punched_at).to_i if saida
       end
       formatar_duracao(total_segundos)
-    end
-
-    def formatar_duracao(total_segundos)
-      horas = total_segundos / 3600
-      minutos = (total_segundos % 3600) / 60
-      segundos = total_segundos % 60
-      format("%02d:%02d:%02d", horas, minutos, segundos)
     end
 
     def montar_linha_dia(data, regs)

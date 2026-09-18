@@ -62,6 +62,42 @@ class EstacaoPontoTest < ActiveSupport::TestCase
     assert_equal "cod-completo-001", estacao.cod_ativacao
   end
 
+  # --- Campos replicados do legado Intranet (pedido direto, 2026-09-02) ---
+
+  test "persists legacy structure fields" do
+    estacao = EstacaoPonto.create!(
+      descricao: "Estacao Legado",
+      cod_ativacao: "cod-legado-001",
+      codigo_unico_maquina: "AA:BB:CC:DD:EE:FF",
+      momento_inicio: Date.new(2026, 1, 1),
+      momento_fim: Date.new(2026, 12, 31),
+      liberado_batida_manual: true
+    )
+    estacao.reload
+
+    assert_equal "AA:BB:CC:DD:EE:FF", estacao.codigo_unico_maquina
+    assert_equal Date.new(2026, 1, 1), estacao.momento_inicio
+    assert_equal Date.new(2026, 12, 31), estacao.momento_fim
+    assert estacao.liberado_batida_manual
+    assert estacao.ativo
+  end
+
+  test "ativo and liberado_batida_manual default correctly" do
+    estacao = EstacaoPonto.create!(descricao: "Estacao Defaults", cod_ativacao: "cod-defaults-001")
+
+    assert estacao.ativo
+    assert_not estacao.liberado_batida_manual
+  end
+
+  test "has_many registro_estacao_pontos and estacao_pings" do
+    estacao = estacoes_ponto(:one)
+    registro = RegistroEstacaoPonto.create!(estacao_ponto: estacao, processado: false)
+    ping = EstacaoPing.create!(estacao_ponto: estacao)
+
+    assert_includes estacao.registro_estacao_pontos, registro
+    assert_includes estacao.estacao_pings, ping
+  end
+
   # --- codigo_ativacao_valido? (Sprint 1, Task 1.4) ---
 
   test "codigo_ativacao_valido? is true for a registered station (case insensitive)" do

@@ -1,10 +1,20 @@
 module Admin
   class RegimesController < Admin::ApplicationController
-    before_action :set_regime, only: [ :edit, :update, :destroy ]
-    before_action -> { require_admin(regimes_path) }, only: [ :new, :create, :edit, :update, :destroy ]
+    before_action :set_regime, only: [:edit, :update, :destroy]
 
     def index
-      @regimes = Regime.includes(:regime_categorias).order(:nome)
+      # Task 23.7 — CanCanCan: autorização explícita para listagem.
+      # Admin/gestor/operador podem visualizar (todos têm :read em :all).
+      authorize! :read, :all
+
+      # Mesmo filtro real do legado (`RegimeDao.paginateList`): só mostra
+      # regimes ativos (não excluídos, marcados como visíveis) e que não
+      # tenham sido substituídos por uma versão mais nova (não são
+      # `anterior_id` de nenhum regime não-excluído).
+      @regimes = Regime.includes(:regime_categorias)
+        .where(excluido: false, visivel: true)
+        .where.not(id: Regime.where(excluido: false).where.not(anterior_id: nil).select(:anterior_id))
+        .order(:nome)
 
       if params[:nome].present?
         @regimes = @regimes.where("nome ILIKE ?", "%#{params[:nome]}%")
@@ -20,10 +30,16 @@ module Admin
     end
 
     def new
+      # Task 23.7 — CanCanCan: somente admin pode criar regimes.
+      authorize! :manage, Regime
+
       @regime = Regime.new
     end
 
     def create
+      # Task 23.7 — CanCanCan: somente admin pode criar regimes.
+      authorize! :manage, Regime
+
       @regime = Regime.new(regime_params)
       if @regime.save
         redirect_to regimes_path, notice: "Regime criado com sucesso"
@@ -33,9 +49,14 @@ module Admin
     end
 
     def edit
+      # Task 23.7 — CanCanCan: somente admin pode editar regimes.
+      authorize! :manage, Regime
     end
 
     def update
+      # Task 23.7 — CanCanCan: somente admin pode atualizar regimes.
+      authorize! :manage, Regime
+
       if @regime.update(regime_params)
         redirect_to regimes_path, notice: "Regime atualizado com sucesso"
       else
@@ -44,6 +65,9 @@ module Admin
     end
 
     def destroy
+      # Task 23.7 — CanCanCan: somente admin pode excluir regimes.
+      authorize! :manage, Regime
+
       @regime.destroy
       redirect_to regimes_path, notice: "Regime excluído com sucesso"
     rescue ActiveRecord::DeleteRestrictionError

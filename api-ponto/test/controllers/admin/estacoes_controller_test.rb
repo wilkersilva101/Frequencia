@@ -82,7 +82,9 @@ module Admin
 
       get new_estacao_path
 
-      assert_redirected_to estacoes_path
+      # Task 23.7 — CanCanCan: acesso negado redireciona para o dashboard
+      # (rescue_from CanCan::AccessDenied), não mais para o recurso.
+      assert_redirected_to dashboard_path
     end
 
     test "usuario nao-admin nao deve criar estacao" do
@@ -91,7 +93,7 @@ module Admin
       assert_no_difference("EstacaoPonto.count") do
         post estacoes_path, params: { estacao: { descricao: "Estacao Nova", cod_ativacao: "cod-nova-001" } }
       end
-      assert_redirected_to estacoes_path
+      assert_redirected_to dashboard_path
     end
 
     test "usuario nao-admin nao deve acessar formulario de edicao" do
@@ -99,7 +101,7 @@ module Admin
 
       get edit_estacao_path(estacoes_ponto(:one))
 
-      assert_redirected_to estacoes_path
+      assert_redirected_to dashboard_path
     end
 
     test "usuario nao-admin nao deve atualizar estacao" do
@@ -108,7 +110,7 @@ module Admin
 
       patch estacao_path(estacao), params: { estacao: { descricao: "Nome Alterado" } }
 
-      assert_redirected_to estacoes_path
+      assert_redirected_to dashboard_path
       assert_not_equal "Nome Alterado", estacao.reload.descricao
     end
 
@@ -119,7 +121,7 @@ module Admin
       assert_no_difference("EstacaoPonto.count") do
         delete estacao_path(estacao)
       end
-      assert_redirected_to estacoes_path
+      assert_redirected_to dashboard_path
     end
 
     test "usuario nao-admin ainda pode listar estacoes" do

@@ -50,6 +50,34 @@
     <%= f.text_area :observacao, class: "form-control", rows: 3 %>
   </div>
 
+  <div class="mb-3">
+    <%= f.label :codigo_unico_maquina, "Código Único da Máquina", class: "form-label" %>
+    <%= f.text_field :codigo_unico_maquina, class: "form-control" %>
+  </div>
+
+  <div class="row">
+    <div class="mb-3 col-md-6">
+      <%= f.label :momento_inicio, "Início de Validade", class: "form-label" %>
+      <%= f.date_field :momento_inicio, class: "form-control" %>
+    </div>
+
+    <div class="mb-3 col-md-6">
+      <%= f.label :momento_fim, "Fim de Validade", class: "form-label" %>
+      <%= f.date_field :momento_fim, class: "form-control" %>
+    </div>
+  </div>
+
+  <div class="mb-3 d-flex gap-3">
+    <div class="form-check">
+      <%= f.check_box :ativo, class: "form-check-input" %>
+      <%= f.label :ativo, "Ativa", class: "form-check-label" %>
+    </div>
+    <div class="form-check">
+      <%= f.check_box :liberado_batida_manual, class: "form-check-input" %>
+      <%= f.label :liberado_batida_manual, "Liberada para Batida Manual", class: "form-check-label" %>
+    </div>
+  </div>
+
   <div class="d-flex gap-2">
     <%= f.submit submit_label, class: "btn btn-primary" %>
     <%= link_to "Cancelar", estacoes_path, class: "btn btn-outline-secondary" %>

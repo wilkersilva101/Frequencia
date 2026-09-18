@@ -8,7 +8,7 @@
 
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
-    <h3 class="card-title"><i class="bi bi-funnel me-1"></i> Filtros</h3>
+    <h3 class="card-title"><i class="fas fa-filter me-1"></i> Filtros</h3>
   </div>
   <div class="card-body">
     <%= form_tag time_records_path, method: :get, class: "row g-2 align-items-end", data: { turbo: false } do %>
@@ -31,10 +31,10 @@
       </div>
       <div class="col-auto d-flex gap-1">
         <%= button_tag class: "btn btn-primary btn-sm" do %>
-          <i class="bi bi-search"></i> Filtrar
+          <i class="fas fa-magnifying-glass"></i> Filtrar
         <% end %>
         <%= link_to time_records_path, class: "btn btn-outline-secondary btn-sm" do %>
-          <i class="bi bi-x-lg"></i> Limpar
+          <i class="fas fa-xmark"></i> Limpar
         <% end %>
       </div>
     <% end %>
@@ -73,36 +73,48 @@
 </script>
 
 <% if @modo_usuario_unico && @resumo_mensal %>
-  <div class="card mb-3">
-    <div class="card-body">
-      <h5 class="card-title">Registro Mensal - <%= format("%02d", @mes_titulo) %>/<%= @ano_titulo %></h5>
-      <div class="row g-2 mt-1">
-        <% [
-          ["Saldo Inicial", @resumo_mensal[:saldo_inicial], "Saldo de horas acumuladas até o mês anterior. Ainda não implementado — depende da meta mensal (regra a definir)."],
-          ["Saldo do Mês", @resumo_mensal[:saldo_do_mes], "Saldo (previsto − trabalhado) somente deste mês. Ainda não implementado — depende da meta mensal (regra a definir)."],
-          ["Saldo Acumulado", @resumo_mensal[:saldo_acumulado], "Saldo inicial + saldo do mês + retificadores. Ainda não implementado."],
-          ["Meta Mensal", @resumo_mensal[:meta_mensal], "Total de horas a cumprir no mês. Regra de negócio ainda não definida."],
-          ["A Cumprir", @resumo_mensal[:a_cumprir], "Total de horas a cumprir no mês até o momento. Ainda não implementado — depende da meta mensal (regra a definir)."],
-          ["Trabalhadas", @resumo_mensal[:trabalhadas], "Total de horas trabalhadas no mês (soma dos pares completos de entrada+saída)."],
-          ["Presença(s)", @resumo_mensal[:presencas], "Cada par de entrada + saída conta como uma presença."],
-          ["Ausência(s)", @resumo_mensal[:ausencias], "Dias já encerrados sem nenhum par completo de entrada + saída."],
-          ["Em Aberto", @resumo_mensal[:em_aberto], "Dia de hoje com entrada registrada sem saída ainda. Após a virada do dia, passa a contar como ausência."],
-        ].each_slice(3) do |linha| %>
-          <% linha.each do |label, valor, tooltip| %>
-            <div class="col-6 col-md-2">
-              <div class="border rounded px-2 py-1 small text-muted text-center" title="<%= tooltip %>">
-                <%= label %> <span aria-hidden="true">&#9432;</span>
-              </div>
+  <%
+    # Pedido do usuário (2026-09-02): quebrar o card único de Registro
+    # Mensal em 3 cards, 3 duplas (label + valor) por card, na mesma
+    # sequência de antes.
+    campos_resumo_mensal = [
+      ["Saldo Inicial", @resumo_mensal[:saldo_inicial], "Saldo de horas acumuladas até o mês anterior. Ainda não implementado — depende da meta mensal (regra a definir)."],
+      ["Saldo do Mês", @resumo_mensal[:saldo_do_mes], "Saldo (previsto − trabalhado) somente deste mês. Ainda não implementado — depende da meta mensal (regra a definir)."],
+      ["Saldo Acumulado", @resumo_mensal[:saldo_acumulado], "Saldo inicial + saldo do mês + retificadores. Ainda não implementado."],
+      ["Meta Mensal", @resumo_mensal[:meta_mensal], "Total de horas a cumprir no mês. Regra de negócio ainda não definida."],
+      ["A Cumprir", @resumo_mensal[:a_cumprir], "Total de horas a cumprir no mês até o momento. Ainda não implementado — depende da meta mensal (regra a definir)."],
+      ["Trabalhadas", @resumo_mensal[:trabalhadas], "Total de horas trabalhadas no mês (soma dos pares completos de entrada+saída)."],
+      ["Presença(s)", @resumo_mensal[:presencas], "Cada par de entrada + saída conta como uma presença."],
+      ["Ausência(s)", @resumo_mensal[:ausencias], "Dias já encerrados sem nenhum par completo de entrada + saída."],
+      ["Em Aberto", @resumo_mensal[:em_aberto], "Dia de hoje com entrada registrada sem saída ainda. Após a virada do dia, passa a contar como ausência."],
+    ]
+  %>
+  <div class="row g-3 mb-3">
+    <% campos_resumo_mensal.each_slice(3).with_index do |grupo, indice| %>
+      <div class="col-12 col-md-4">
+        <div class="card h-100">
+          <div class="card-body">
+            <% if indice.zero? %>
+              <h5 class="card-title">Registro Mensal - <%= format("%02d", @mes_titulo) %>/<%= @ano_titulo %></h5>
+            <% end %>
+            <div class="row g-2 mt-1">
+              <% grupo.each do |label, valor, tooltip| %>
+                <div class="col-6">
+                  <div class="border rounded px-2 py-1 small text-muted text-center" title="<%= tooltip %>">
+                    <%= label %> <span aria-hidden="true">&#9432;</span>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="border rounded px-2 py-1 text-center fw-bold bg-light">
+                    <%= valor %>
+                  </div>
+                </div>
+              <% end %>
             </div>
-            <div class="col-6 col-md-2">
-              <div class="border rounded px-2 py-1 text-center fw-bold bg-light">
-                <%= valor %>
-              </div>
-            </div>
-          <% end %>
-        <% end %>
+          </div>
+        </div>
       </div>
-    </div>
+    <% end %>
   </div>
 
   <p class="mb-3">
@@ -196,6 +208,6 @@
   </div>
 <% else %>
   <div class="alert alert-info mb-0">
-    <i class="bi bi-info-circle me-1"></i> Busque um usuário para ver os registros de ponto.
+    <i class="fas fa-circle-info me-1"></i> Busque um usuário para ver os registros de ponto.
   </div>
 <% end %>

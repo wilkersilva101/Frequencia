@@ -12,6 +12,10 @@ api-ponto/vendor/cache/
 api-ponto/node_modules/
 api-ponto/storage/
 
+# CSS/JS build output (Sprint 24.1 — pipeline Node/Sass)
+api-ponto/app/assets/builds/*
+!api-ponto/app/assets/builds/.keep
+
 # Rails credentials
 api-ponto/config/master.key
 api-ponto/config/credentials/*.key

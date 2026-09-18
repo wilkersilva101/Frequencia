@@ -1,0 +1,138 @@
+// ============================================================
+// CSS custom portado de basic8/app/assets/stylesheets/application.scss
+// (Sprint 24.2). No basic8 esse bloco vive inline no application.scss,
+// aqui foi extraído para _custom.scss para manter o entry point limpo.
+//
+// Trechos do basic8 DELIBERADAMENTE NÃO portados (dependências que a
+// task 24.1 decidiu não trazer para o Frequencia):
+// - Import/fix de toastr (gem/pacote não presente no package.json)
+// - Import/fix de tom-select (.ts-control, .ts-wrapper, .ts-dropdown)
+// - Import/fix de bootstrap-table (.bootstrap-table .table thead th .asc/.desc)
+// - Import/estilos de ckeditor5 (.ck-content, .ck-editor__*, .ck-toolbar etc)
+// - Bloco "MODO ESCURO" (@if $enable-dark-mode { @include color-mode(dark) {...} })
+//   — _variables.scss do Frequencia não define $enable-dark-mode
+// - .login-page-theme — botão de troca de tema da login page do basic8,
+//   não solicitado pela task 24.2 (fora da lista de seletores a portar)
+// - fieldset { border: none !important; padding: 0 !important; }
+//   — reset genérico não listado na task 24.2
+// - .list-container:has(.list-item) .list-empty-state — depende de partial
+//   de listagem específico do basic8, não presente no Frequencia
+// ============================================================
+
+a {
+  text-decoration: none !important;
+}
+
+a:hover,
+a:focus {
+  text-decoration: none !important;
+}
+
+.main-sidebar {
+  transition: margin-left .24s ease, transform .24s ease, width .24s ease !important;
+}
+
+.content-wrapper,
+.main-footer {
+  transition: margin-left .24s ease, padding .24s ease !important;
+}
+
+.text-pointer {
+  cursor: text;
+}
+
+.header-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: .6rem;
+  box-shadow: var(--bs-box-shadow-sm);
+  font-size: 18px;
+}
+
+.no-validate {
+
+  .form-check-input:valid,
+  .form-check-input.is-valid {
+    border-color: #000 !important;
+  }
+
+  .form-check-input:valid:checked,
+  .form-check-input.is-valid:checked {
+    border-color: #6f42c1 !important;
+    background-color: #6f42c1 !important;
+  }
+
+  .form-check-input:valid~.form-check-label,
+  .form-check-input.is-valid~.form-check-label {
+    color: #000 !important;
+  }
+
+  .form-check-input:valid:checked~.form-check-label,
+  .form-check-input.is-valid:checked~.form-check-label {
+    color: #6f42c1 !important;
+  }
+}
+
+.form-control,
+.form-select,
+.input-group-text {
+  border: 1px solid var(--bs-border-color) !important;
+}
+
+.form-control.is-invalid,
+.form-select.is-invalid,
+.input-group.has-validation > .input-group-text.is-invalid,
+.input-group.has-validation > :nth-child(n + 3):not(.dropdown-toggle):not(.dropdown-menu):focus {
+  border-color: $danger !important;
+}
+
+/* Spinner oculto por padrão */
+.d-none-unless-busy {
+  display: none;
+}
+
+turbo-frame[busy] .d-none-unless-busy {
+  display: inline-block;
+}
+
+.list-item:hover {
+  background-color: var(--bs-tertiary-bg);
+  border-radius: .25rem;
+}
+
+.active-filters {
+  span {
+    display: inline-block;
+    margin-right: 0.5em;
+
+    &:hover {
+      opacity: 0.8;
+    }
+
+    i {
+      margin: 0px 2px 0.2px 2px;
+      font-size: 100%;
+      cursor: pointer;
+    }
+  }
+}
+
+/* fix space below pagination */
+ul.pagination {
+  margin-bottom: 0 !important;
+}
+
+/* fix table hover */
+.table-hover tbody tr:hover {
+  background-color: var(--bs-table-hover-bg);
+}
+
+/* card with overflow-hidden must not clip dropdown menus */
+.card.overflow-hidden .dropdown-menu {
+  z-index: 1050;
+}

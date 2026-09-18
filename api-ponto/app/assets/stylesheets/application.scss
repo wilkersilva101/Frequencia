@@ -1,0 +1,24 @@
+// ============================================================
+// Entry point do build Sass (Sprint 24.1 — infraestrutura Node/Sass).
+//
+// Compila para app/assets/builds/app.css (yarn build:css). Propositalmente
+// NÃO se chama "application.css" para não colidir, no Propshaft, com o
+// manifesto atual em app/assets/stylesheets/application.css (que ainda
+// carrega Bootstrap/AdminLTE/Font Awesome via CDN e continua sendo o que
+// o layout referencia). A troca do layout para usar este build (removendo
+// os imports CDN) é escopo da task 24.4, não desta.
+// ============================================================
+
+@import "variables";
+@import "bootstrap/scss/bootstrap";
+
+@import "admin-lte/src/scss/adminlte";
+
+@import "@fortawesome/fontawesome-free/scss/fontawesome";
+@import "@fortawesome/fontawesome-free/scss/brands";
+@import "@fortawesome/fontawesome-free/scss/regular";
+@import "@fortawesome/fontawesome-free/scss/solid";
+@import "@fortawesome/fontawesome-free/scss/v4-shims";
+
+@import "custom";
+@import "dark_mode";

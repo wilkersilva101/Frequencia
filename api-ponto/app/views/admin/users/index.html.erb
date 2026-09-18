@@ -2,18 +2,13 @@
 
 <div class="row mb-3">
   <div class="col-sm-6">
-    <p class="text-muted mb-0"><%= @users.total_count %> usuário(s) cadastrado(s)</p>
-  </div>
-  <div class="col-sm-6 text-sm-end">
-    <%= link_to new_user_path, class: "btn btn-primary" do %>
-      <i class="bi bi-person-plus me-1"></i> Novo Usuário
-    <% end %>
+    <p class="text-muted mb-0"><%= @vinculos.total_count %> usuário(s)</p>
   </div>
 </div>
 
 <div class="card card-primary card-outline">
   <div class="card-header">
-    <h3 class="card-title"><i class="bi bi-people me-1"></i> Lista de Usuários</h3>
+    <h3 class="card-title"><i class="fas fa-users me-1"></i> Lista de Usuários</h3>
   </div>
   <!--begin::Card Body-->
   <div class="card-body p-0">
@@ -22,11 +17,11 @@
         <table class="table table-striped table-hover align-middle mb-0">
           <thead>
             <tr>
-              <th style="width: 35%">Nome Completo</th>
+              <th style="width: 30%">Nome Completo</th>
               <th style="width: 18%">Username</th>
               <th style="width: 15%">Status</th>
               <th style="width: 15%">Digitais</th>
-              <th class="text-end" style="width: 17%">Ações</th>
+              <th class="text-end" style="width: 22%">Ações</th>
             </tr>
             <tr class="table-light align-middle">
               <td class="py-2">
@@ -50,17 +45,100 @@
               <td class="text-end py-2">
                 <div class="d-flex gap-1 justify-content-end">
                   <%= button_tag class: "btn btn-primary btn-sm", title: "Filtrar" do %>
-                    <i class="bi bi-search"></i> Filtrar
+                    <i class="fas fa-magnifying-glass"></i> Filtrar
                   <% end %>
                   <%= link_to users_path, class: "btn btn-outline-secondary btn-sm", title: "Limpar Filtros" do %>
-                    <i class="bi bi-x-lg"></i>
+                    <i class="fas fa-xmark"></i>
                   <% end %>
                 </div>
               </td>
             </tr>
           </thead>
           <tbody>
-            <% @users.each do |user| %>
+            <% @vinculos.each do |vinculo| %>
+              <% user = @user_por_cpf[vinculo.pessoa&.cpf] %>
+              <tr>
+                <td><%= vinculo.pessoa&.nome %></td>
+                <td>
+                  <% if user %>
+                    <code><%= user.username %></code>
+                  <% else %>
+                    <span class="text-muted">—</span>
+                  <% end %>
+                </td>
+                <td>
+                  <% if user.nil? %>
+                    <span class="badge text-bg-secondary" title="Vínculo ativo no Pessoas, sem cadastro local no Frequencia">Sem cadastro local</span>
+                  <% elsif user.status == 1 %>
+                    <span class="badge text-bg-success">Ativo</span>
+                  <% else %>
+                    <span class="badge text-bg-danger">Inativo</span>
+                  <% end %>
+                </td>
+                <td>
+                  <% if user.nil? %>
+                    <span class="text-muted">—</span>
+                  <% elsif user.digitais_hash.present? %>
+                    <span class="badge text-bg-info">Cadastrada</span>
+                  <% else %>
+                    <span class="badge text-bg-secondary">Não</span>
+                  <% end %>
+                </td>
+                <td class="text-end">
+                  <div class="d-flex gap-1 justify-content-end">
+                    <% if user.nil? %>
+                      <span class="btn btn-xs btn-outline-secondary disabled" title="Sem cadastro local — cadastro a partir do Pessoas ainda não implementado">
+                        <i class="fas fa-user-plus"></i>
+                      </span>
+                    <% else %>
+                      <%= link_to edit_user_path(user), class: "btn btn-xs btn-outline-primary", title: "Editar" do %>
+                        <i class="fas fa-pencil"></i>
+                      <% end %>
+                    <% end %>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+            <% if @vinculos.empty? %>
+              <tr><td colspan="5" class="text-muted text-center">Nenhum usuário encontrado</td></tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </div>
+  <!--end::Card Body-->
+  <!--begin::Card Footer-->
+  <div class="card-footer clearfix">
+    <div class="float-start pt-1 fs-7 text-body-secondary">
+      <% if @vinculos.any? %>
+        Mostrando <%= @vinculos.offset_value + 1 %> a <%= @vinculos.offset_value + @vinculos.length %> de <%= @vinculos.total_count %> usuários
+      <% end %>
+    </div>
+    <%= paginate @vinculos %>
+  </div>
+  <!--end::Card Footer-->
+</div>
+
+<% if @users_sem_cpf.any? %>
+  <div class="card card-outline card-secondary mt-4">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-id-badge me-1"></i> Contas locais sem vínculo no Pessoas</h3>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th style="width: 30%">Nome Completo</th>
+              <th style="width: 18%">Username</th>
+              <th style="width: 15%">Status</th>
+              <th style="width: 15%">Digitais</th>
+              <th class="text-end" style="width: 22%">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @users_sem_cpf.each do |user| %>
               <tr>
                 <td><%= user.nome_completo %></td>
                 <td><code><%= user.username %></code></td>
@@ -81,16 +159,7 @@
                 <td class="text-end">
                   <div class="d-flex gap-1 justify-content-end">
                     <%= link_to edit_user_path(user), class: "btn btn-xs btn-outline-primary", title: "Editar" do %>
-                      <i class="bi bi-pencil"></i>
-                    <% end %>
-                    <% if user.status == 1 %>
-                      <%= button_to user_path(user), method: :delete, class: "btn btn-xs btn-outline-danger", title: "Inativar", data: { turbo_confirm: "Tem certeza?" } do %>
-                        <i class="bi bi-person-x"></i>
-                      <% end %>
-                    <% else %>
-                      <%= button_to purge_user_path(user), method: :delete, class: "btn btn-xs btn-danger", title: "Excluir definitivamente", data: { turbo_confirm: "Tem certeza que deseja excluir definitivamente este usuário?" } do %>
-                        <i class="bi bi-trash"></i>
-                      <% end %>
+                      <i class="fas fa-pencil"></i>
                     <% end %>
                   </div>
                 </td>
@@ -99,16 +168,6 @@
           </tbody>
         </table>
       </div>
-    <% end %>
-  </div>
-  <!--end::Card Body-->
-  <!--begin::Card Footer-->
-  <div class="card-footer clearfix">
-    <div class="float-start pt-1 fs-7 text-body-secondary">
-      Mostrando <%= @users.offset_value + 1 %> a <%= @users.offset_value + @users.length %> de <%= @users.total_count %> usuários
     </div>
-    <%= paginate @users %>
   </div>
-  <!--end::Card Footer-->
-</div>
-
+<% end %>

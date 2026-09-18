@@ -1,21 +1,22 @@
 require "test_helper"
 
 class ResolverCpfPorMatriculaServiceTest < ActiveSupport::TestCase
-  def stub_competencia(resposta)
-    SticapiClient::Gestorh.define_singleton_method(:competencia) { |*_args| resposta }
+  # Não usamos dados reais no banco `pessoas` de teste (sem schema
+  # carregado, ver nota em test/jobs/importar_dados_pessoa_job_test.rb) —
+  # stubamos o ponto de entrada único que o serviço usa,
+  # `Pessoas::GestorhContrachequeMirror.pares_matricula_cpf_para`.
+  def stub_pares(resposta)
+    Pessoas::GestorhContrachequeMirror.define_singleton_method(:pares_matricula_cpf_para) { |*_args, **_kwargs| resposta }
     yield
   ensure
-    SticapiClient::Gestorh.singleton_class.remove_method(:competencia)
+    Pessoas::GestorhContrachequeMirror.singleton_class.remove_method(:pares_matricula_cpf_para)
   end
 
   test "resolve as matriculas encontradas na competencia" do
-    folha = [
-      { "matricula" => "1001", "nome" => "Fulano", "cpf" => "11122233344", "nascimento" => "1990-01-01", "tipo_vinculo" => "Efetivo", "folha" => "X" },
-      { "matricula" => "1002", "nome" => "Ciclano", "cpf" => "55566677788", "nascimento" => "1985-05-05", "tipo_vinculo" => "Comissionado", "folha" => "X" }
-    ]
+    pares = [ [ "1001", "11122233344" ], [ "1002", "55566677788" ] ]
 
     resultado = nil
-    stub_competencia(folha) do
+    stub_pares(pares) do
       resultado = ResolverCpfPorMatriculaService.call(%w[1001 1002], mes: 7, ano: 2026)
     end
 
@@ -23,10 +24,10 @@ class ResolverCpfPorMatriculaServiceTest < ActiveSupport::TestCase
   end
 
   test "matricula nao encontrada na competencia nao aparece no resultado" do
-    folha = [ { "matricula" => "1001", "cpf" => "11122233344" } ]
+    pares = [ [ "1001", "11122233344" ] ]
 
     resultado = nil
-    stub_competencia(folha) do
+    stub_pares(pares) do
       resultado = ResolverCpfPorMatriculaService.call(%w[1001 9999], mes: 7, ano: 2026)
     end
 
@@ -36,7 +37,7 @@ class ResolverCpfPorMatriculaServiceTest < ActiveSupport::TestCase
 
   test "retorna hash vazio quando a competencia esta vazia" do
     resultado = nil
-    stub_competencia([]) do
+    stub_pares([]) do
       resultado = ResolverCpfPorMatriculaService.call(%w[1001], mes: 7, ano: 2026)
     end
 
@@ -44,10 +45,10 @@ class ResolverCpfPorMatriculaServiceTest < ActiveSupport::TestCase
   end
 
   test "normaliza matriculas para string na busca (integer vs string)" do
-    folha = [ { "matricula" => "1001", "cpf" => "11122233344" } ]
+    pares = [ [ "1001", "11122233344" ] ]
 
     resultado = nil
-    stub_competencia(folha) do
+    stub_pares(pares) do
       resultado = ResolverCpfPorMatriculaService.call([ 1001 ], mes: 7, ano: 2026)
     end
 
@@ -55,27 +56,27 @@ class ResolverCpfPorMatriculaServiceTest < ActiveSupport::TestCase
   end
 
   test "ignora registros da competencia sem matricula ou cpf" do
-    folha = [
-      { "matricula" => "1001", "cpf" => "11122233344" },
-      { "matricula" => nil, "cpf" => "99988877766" },
-      { "matricula" => "1002", "cpf" => nil }
+    pares = [
+      [ "1001", "11122233344" ],
+      [ nil, "99988877766" ],
+      [ "1002", nil ]
     ]
 
     resultado = nil
-    stub_competencia(folha) do
+    stub_pares(pares) do
       resultado = ResolverCpfPorMatriculaService.call(%w[1001 1002], mes: 7, ano: 2026)
     end
 
     assert_equal({ "1001" => "11122233344" }, resultado)
   end
 
-  test "chama SticapiClient::Gestorh.competencia apenas uma vez por instancia mesmo com multiplas chamadas" do
+  test "chama pares_matricula_cpf_para apenas uma vez por instancia mesmo com multiplas chamadas" do
     chamadas = 0
-    folha = [ { "matricula" => "1001", "cpf" => "11122233344" } ]
+    pares = [ [ "1001", "11122233344" ] ]
 
-    SticapiClient::Gestorh.define_singleton_method(:competencia) do |*_args|
+    Pessoas::GestorhContrachequeMirror.define_singleton_method(:pares_matricula_cpf_para) do |*_args, **_kwargs|
       chamadas += 1
-      folha
+      pares
     end
 
     begin
@@ -83,7 +84,7 @@ class ResolverCpfPorMatriculaServiceTest < ActiveSupport::TestCase
       service.call(%w[1001])
       service.call(%w[1001])
     ensure
-      SticapiClient::Gestorh.singleton_class.remove_method(:competencia)
+      Pessoas::GestorhContrachequeMirror.singleton_class.remove_method(:pares_matricula_cpf_para)
     end
 
     assert_equal 1, chamadas
@@ -93,11 +94,11 @@ class ResolverCpfPorMatriculaServiceTest < ActiveSupport::TestCase
 
   test "mais_recente prioriza o mes atual quando a matricula aparece nos dois" do
     travel_to Time.zone.local(2026, 7, 15) do
-      SticapiClient::Gestorh.define_singleton_method(:competencia) do |mes:, ano:|
+      Pessoas::GestorhContrachequeMirror.define_singleton_method(:pares_matricula_cpf_para) do |mes:, ano:|
         if mes == 7 && ano == 2026
-          [ { "matricula" => "1001", "cpf" => "AAA_MES_ATUAL" } ]
+          [ [ "1001", "AAA_MES_ATUAL" ] ]
         elsif mes == 6 && ano == 2026
-          [ { "matricula" => "1001", "cpf" => "BBB_MES_ANTERIOR" } ]
+          [ [ "1001", "BBB_MES_ANTERIOR" ] ]
         else
           []
         end
@@ -107,16 +108,16 @@ class ResolverCpfPorMatriculaServiceTest < ActiveSupport::TestCase
         resultado = ResolverCpfPorMatriculaService.mais_recente(%w[1001])
         assert_equal({ "1001" => "AAA_MES_ATUAL" }, resultado)
       ensure
-        SticapiClient::Gestorh.singleton_class.remove_method(:competencia)
+        Pessoas::GestorhContrachequeMirror.singleton_class.remove_method(:pares_matricula_cpf_para)
       end
     end
   end
 
   test "mais_recente usa o mes anterior quando a matricula so aparece nele" do
     travel_to Time.zone.local(2026, 7, 15) do
-      SticapiClient::Gestorh.define_singleton_method(:competencia) do |mes:, ano:|
+      Pessoas::GestorhContrachequeMirror.define_singleton_method(:pares_matricula_cpf_para) do |mes:, ano:|
         if mes == 6 && ano == 2026
-          [ { "matricula" => "2002", "cpf" => "SO_MES_ANTERIOR" } ]
+          [ [ "2002", "SO_MES_ANTERIOR" ] ]
         else
           []
         end
@@ -126,7 +127,7 @@ class ResolverCpfPorMatriculaServiceTest < ActiveSupport::TestCase
         resultado = ResolverCpfPorMatriculaService.mais_recente(%w[2002])
         assert_equal({ "2002" => "SO_MES_ANTERIOR" }, resultado)
       ensure
-        SticapiClient::Gestorh.singleton_class.remove_method(:competencia)
+        Pessoas::GestorhContrachequeMirror.singleton_class.remove_method(:pares_matricula_cpf_para)
       end
     end
   end
@@ -135,7 +136,7 @@ class ResolverCpfPorMatriculaServiceTest < ActiveSupport::TestCase
     travel_to Time.zone.local(2026, 1, 10) do
       chamadas_mes_ano = []
 
-      SticapiClient::Gestorh.define_singleton_method(:competencia) do |mes:, ano:|
+      Pessoas::GestorhContrachequeMirror.define_singleton_method(:pares_matricula_cpf_para) do |mes:, ano:|
         chamadas_mes_ano << [ mes, ano ]
         []
       end
@@ -145,7 +146,7 @@ class ResolverCpfPorMatriculaServiceTest < ActiveSupport::TestCase
         assert_includes chamadas_mes_ano, [ 12, 2025 ]
         assert_includes chamadas_mes_ano, [ 1, 2026 ]
       ensure
-        SticapiClient::Gestorh.singleton_class.remove_method(:competencia)
+        Pessoas::GestorhContrachequeMirror.singleton_class.remove_method(:pares_matricula_cpf_para)
       end
     end
   end

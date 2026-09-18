@@ -6,14 +6,14 @@
   </div>
   <div class="col-sm-6 text-sm-end">
     <%= link_to new_regime_path, class: "btn btn-primary" do %>
-      <i class="bi bi-plus-lg me-1"></i> Novo Regime
+      <i class="fas fa-plus me-1"></i> Novo Regime
     <% end %>
   </div>
 </div>
 
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
-    <h3 class="card-title"><i class="bi bi-funnel me-1"></i> Filtros</h3>
+    <h3 class="card-title"><i class="fas fa-filter me-1"></i> Filtros</h3>
   </div>
   <div class="card-body">
     <%= form_tag regimes_path, method: :get, class: "row g-2 align-items-end", data: { turbo: false } do %>
@@ -37,58 +37,78 @@
       </div>
       <div class="col-auto d-flex gap-1">
         <%= button_tag class: "btn btn-primary btn-sm" do %>
-          <i class="bi bi-search"></i> Filtrar
+          <i class="fas fa-magnifying-glass"></i> Filtrar
         <% end %>
         <%= link_to regimes_path, class: "btn btn-outline-secondary btn-sm" do %>
-          <i class="bi bi-x-lg"></i> Limpar
+          <i class="fas fa-xmark"></i> Limpar
         <% end %>
       </div>
     <% end %>
   </div>
 </div>
 
-<div class="card card-primary card-outline">
-  <div class="card-header">
-    <h3 class="card-title"><i class="bi bi-clock-history me-1"></i> Lista de Regimes</h3>
+<%
+  # Agrupamento visual por categoria (pedido do usuário, 2026-09-02): um
+  # regime com mais de uma categoria aparece em cada grupo a que pertence
+  # — mesmo espírito do legado, que já mostrava todas as categorias do
+  # regime lado a lado. Regime sem nenhuma categoria cai num grupo à parte.
+  grupos = Regime::CATEGORIAS_DISPONIVEIS.filter_map { |codigo|
+    regimes_da_categoria = @regimes.select { |r| r.categorias.include?(codigo) }
+    [ Regime::CATEGORIAS_LABELS[codigo], regimes_da_categoria ] if regimes_da_categoria.any?
+  }
+  sem_categoria = @regimes.select { |r| r.categorias.empty? }
+  grupos << [ "Sem categoria", sem_categoria ] if sem_categoria.any?
+%>
+
+<% if @regimes.empty? %>
+  <div class="card card-primary card-outline">
+    <div class="card-body text-muted text-center">Nenhum regime cadastrado</div>
   </div>
-  <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table table-striped mb-0">
-        <thead>
-          <tr>
-            <th>Categoria</th>
-            <th>Nome</th>
-            <th>Modalidade</th>
-            <th>Resumo</th>
-            <th>Meta Semanal</th>
-            <th>Gerência</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% @regimes.each do |regime| %>
-            <tr>
-              <td><%= regime.categorias.map { |c| Regime::CATEGORIAS_LABELS[c] || c }.join(", ") %></td>
-              <td><%= regime.nome %></td>
-              <td><%= Regime::MODALIDADES_LABELS[regime.modalidade] || regime.modalidade %></td>
-              <td><%= regime.resumo %></td>
-              <td><%= regime.meta_semanal %></td>
-              <td class="text-end">
-                <div class="d-flex gap-1 justify-content-end">
-                  <%= link_to edit_regime_path(regime), class: "btn btn-xs btn-outline-primary" do %>
-                    <i class="bi bi-pencil"></i>
-                  <% end %>
-                  <%= button_to regime_path(regime), method: :delete, class: "btn btn-xs btn-outline-danger", data: { turbo_confirm: "Tem certeza que deseja excluir este regime?" } do %>
-                    <i class="bi bi-trash"></i>
-                  <% end %>
-                </div>
-              </td>
-            </tr>
-          <% end %>
-          <% if @regimes.empty? %>
-            <tr><td colspan="6" class="text-muted text-center">Nenhum regime cadastrado</td></tr>
-          <% end %>
-        </tbody>
-      </table>
+<% else %>
+  <% grupos.each do |rotulo_categoria, regimes_do_grupo| %>
+    <div class="card card-primary card-outline mb-3">
+      <div class="card-header">
+        <h3 class="card-title fw-bold"><i class="fas fa-tag me-1"></i> <%= rotulo_categoria %></h3>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-striped table-bordered table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Modalidade</th>
+                <th>Resumo</th>
+                <th>Meta Semanal</th>
+                <th>Gerência</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% regimes_do_grupo.each do |regime| %>
+                <tr>
+                  <td class="fw-bold"><%= regime.nome %></td>
+                  <td><%= Regime::MODALIDADES_LABELS[regime.modalidade] || regime.modalidade %></td>
+                  <td>
+                    <% regime.resumo_exibicao.each do |linha| %>
+                      <%= linha %><br>
+                    <% end %>
+                  </td>
+                  <td><%= regime.meta_semanal %></td>
+                  <td class="text-end">
+                    <div class="d-flex gap-1 justify-content-end">
+                      <%= link_to edit_regime_path(regime), class: "btn btn-xs btn-outline-primary" do %>
+                        <i class="fas fa-pencil"></i>
+                      <% end %>
+                      <%= button_to regime_path(regime), method: :delete, class: "btn btn-xs btn-outline-danger", data: { turbo_confirm: "Tem certeza que deseja excluir este regime?" } do %>
+                        <i class="fas fa-trash"></i>
+                      <% end %>
+                    </div>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
+  <% end %>
+<% end %>

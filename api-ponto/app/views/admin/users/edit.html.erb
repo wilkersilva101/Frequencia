@@ -4,14 +4,14 @@
   <div class="col-md-8 col-lg-6">
     <div class="card card-primary card-outline">
       <div class="card-header">
-        <h3 class="card-title"><i class="bi bi-pencil me-1"></i> Editar Usuário — <%= @user.nome_completo %></h3>
+        <h3 class="card-title"><i class="fas fa-pencil me-1"></i> Editar Usuário — <%= @user.nome_completo %></h3>
       </div>
       <div class="card-body">
         <% bloqueado = @user.cpf.present? %>
 
         <% if bloqueado %>
           <div class="alert alert-info">
-            <i class="bi bi-info-circle me-1"></i>
+            <i class="fas fa-circle-info me-1"></i>
             Este frequentador está vinculado ao Pessoas — os dados cadastrais vêm de lá e não podem ser editados manualmente aqui. Para atualizar, use o botão "Reimportar do Pessoas" na listagem de frequentadores.
           </div>
         <% end %>

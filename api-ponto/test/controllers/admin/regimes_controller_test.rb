@@ -17,19 +17,62 @@ module Admin
       assert_select "table tbody tr", count: Regime.count
       assert_select "td", text: "Jornada A"
       assert_select "td", text: "Jornada B"
-      assert_select "td", text: "Servidor de Carreira"
-      assert_select "td", text: "SERVIDOR_CARREIRA", count: 0
+      assert_select ".card-title", text: /Servidor Efetivo/
+      assert_select ".card-title", text: "SERVIDOR_CARREIRA", count: 0
       assert_select "td", text: "Horas com intervalo"
       assert_select "td", text: "Ocorrências"
       assert_select "td", text: "HORAS_COM_INTERVALO", count: 0
       assert_select "td", text: "OCORRENCIAS", count: 0
     end
 
+    test "nao lista regime excluido" do
+      Regime.create!(nome: "Jornada Visivel")
+      Regime.create!(nome: "Jornada Excluida", excluido: true)
+
+      get regimes_path
+
+      assert_response :success
+      assert_select "td", text: "Jornada Visivel"
+      assert_select "td", text: "Jornada Excluida", count: 0
+    end
+
+    test "nao lista regime marcado como nao visivel" do
+      Regime.create!(nome: "Jornada Visivel")
+      Regime.create!(nome: "Jornada Invisivel", visivel: false)
+
+      get regimes_path
+
+      assert_response :success
+      assert_select "td", text: "Jornada Visivel"
+      assert_select "td", text: "Jornada Invisivel", count: 0
+    end
+
+    test "nao lista regime substituido por uma versao mais nova (anterior_id)" do
+      antigo = Regime.create!(nome: "Jornada Antiga")
+      Regime.create!(nome: "Jornada Nova", anterior: antigo)
+
+      get regimes_path
+
+      assert_response :success
+      assert_select "td", text: "Jornada Nova"
+      assert_select "td", text: "Jornada Antiga", count: 0
+    end
+
+    test "lista regime antigo se a versao mais nova que o substituiu estiver excluida" do
+      antigo = Regime.create!(nome: "Jornada Antiga")
+      Regime.create!(nome: "Jornada Nova", anterior: antigo, excluido: true)
+
+      get regimes_path
+
+      assert_response :success
+      assert_select "td", text: "Jornada Antiga"
+    end
+
     test "deve funcionar com base vazia" do
       get regimes_path
 
       assert_response :success
-      assert_select "td", text: "Nenhum regime cadastrado"
+      assert_select ".card-body", text: "Nenhum regime cadastrado"
     end
 
     test "filtra por nome" do
@@ -169,7 +212,9 @@ module Admin
 
       get new_regime_path
 
-      assert_redirected_to regimes_path
+      # Task 23.7 — CanCanCan: acesso negado redireciona para o dashboard
+      # (rescue_from CanCan::AccessDenied), não mais para o recurso.
+      assert_redirected_to dashboard_path
     end
 
     test "usuario nao-admin nao deve criar regime" do
@@ -178,7 +223,7 @@ module Admin
       assert_no_difference("Regime.count") do
         post regimes_path, params: { regime: { nome: "Jornada Nova" } }
       end
-      assert_redirected_to regimes_path
+      assert_redirected_to dashboard_path
     end
 
     test "usuario nao-admin nao deve acessar formulario de edicao" do
@@ -187,7 +232,7 @@ module Admin
       regime = Regime.create!(nome: "Jornada Qualquer")
       get edit_regime_path(regime)
 
-      assert_redirected_to regimes_path
+      assert_redirected_to dashboard_path
     end
 
     private

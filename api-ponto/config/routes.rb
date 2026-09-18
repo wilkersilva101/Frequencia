@@ -14,6 +14,15 @@ Rails.application.routes.draw do
   require "sidekiq/web"
   mount Sidekiq::Web => "/sidekiq", constraints: AdminConstraint.new
 
+  # Task 23.6 — Devise routes para o model User.
+  # `path: "u"` coloca as rotas Devise em /u/sign_in, /u/sign_out etc.
+  # (padrão do basic8). skip: registrations — cadastro vem do Pessoas2, não
+  # auto-registro. controllers: sessions customizado (Users::SessionsController)
+  # para manter layout "login" + session[:user_id] + after_sign_in para
+  # dashboard. Login admin continua em /login via controllers abaixo.
+  devise_for :users, path: "u", skip: %i[registrations],
+                     controllers: { sessions: "users/sessions" }
+
   # Admin frontend (R.2 — controllers vivem em Admin::, paths preservados via
   # `module:` para não quebrar login_path/dashboard_path/users_path/etc.
   # já usados pelos testes e pelas views — ver ADR-001, Seção 4)
@@ -21,20 +30,24 @@ Rails.application.routes.draw do
     root to: "dashboard#index"
     get "login", to: "sessions#new"
     post "login", to: "sessions#create"
-    delete "logout", to: "sessions#destroy"
+    # NOTE (Task 23.6): rota de logout removida do scope admin — agora
+    # mapeia para `Users::SessionsController#destroy` (Devise) lá embaixo
+    # neste arquivo. Mantém `logout_path` válido.
     get "dashboard", to: "dashboard#index"
     # NOTE (R.2): `config.api_only = true` (ver application.rb) faz o Rails
     # excluir `:new`/`:edit` das rotas padrão de `resources` (ações que só
     # existem para servir formulário HTML). O módulo administrativo precisa
     # delas — adicionadas explicitamente via `concerns`/`except` combinado a
     # rotas extras.
-    get "users/new", to: "users#new", as: :new_user
+    # Task 21.6: criação/exclusão manual de frequentador pela tela admin
+    # removida — o cadastro passa a vir inteiramente do Pessoas (via
+    # Pessoas::Vinculo, tasks 8.14-8.16) e a autenticação de quem tem cpf
+    # via bcrypt do pessoas2 (task 21.5). Sobra apenas leitura/listagem
+    # (:index) e edição (:edit/:update), esta última só útil hoje para
+    # contas locais sem cpf (admins/cadastros manuais pré-existentes) — o
+    # próprio controller bloqueia edição de quem tem cpf.
     get "users/:id/edit", to: "users#edit", as: :edit_user
-    resources :users, except: [:show, :new, :edit] do
-      member do
-        delete :purge
-      end
-    end
+    resources :users, only: [:index, :update]
     resources :time_records, only: [:index]
     resources :frequentadores, only: [:index] do
       member do
@@ -78,5 +91,19 @@ Rails.application.routes.draw do
     post "Frequentador", to: "frequentador#create"
     get "AdicioneEstacao", to: "adicione_estacao#show"
     get "ProblemaRegistro", to: "problema_registro#show"
+  end
+
+  # Task 23.6 — Rota de logout customizada que mapeia para o controller
+  # Devise sessions (Users::SessionsController), preservando o helper
+  # `logout_path` usado em dezenas de lugares (testes, views, controllers).
+  # O controller destrói a sessão via `sign_out` (Devise) + limpa
+  # `session[:user_id]` e redireciona para login_path.
+  # Fora do scope module:"admin" para não herdar o namespace —
+  # o controller é Users::Sessions, não Admin::Sessions.
+  # Envolto em `devise_scope :user` para que `request.env["devise.mapping"]`
+  # seja setado (DeviseController#devise_mapping depende disso) e o destroy
+  # do Devise funcione.
+  devise_scope :user do
+    delete "logout", to: "users/sessions#destroy", as: :logout
   end
 end

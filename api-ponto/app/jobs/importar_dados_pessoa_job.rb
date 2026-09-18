@@ -30,11 +30,11 @@ class ImportarDadosPessoaJob < ApplicationJob
   def importar_usuario(user)
     return if user.cpf.blank?
 
-    dados = SticapiClient::Pessoas.get_by_cpf(cpf: user.cpf)
-    return if dados.blank? || dados["nome"].blank?
+    pessoa = Pessoas::Pessoa.find_by(cpf: user.cpf)
+    return if pessoa.blank? || pessoa.nome.blank?
 
-    user.update!(nome_completo: dados["nome"])
-    AtualizarFrequentadorCacheService.call(cpf: user.cpf, dados: dados)
+    user.update!(nome_completo: pessoa.nome)
+    AtualizarFrequentadorCacheService.call(cpf: user.cpf, pessoa: pessoa)
   rescue StandardError => e
     Rails.logger.error("[ImportarDadosPessoaJob] Falha ao importar CPF #{user.cpf}: #{e.message}")
   end

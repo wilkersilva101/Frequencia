@@ -59,6 +59,7 @@ pt-BR:
     format: "%{attribute} %{message}"
     messages:
       blank: "não pode ficar em branco"
+      required: "não pode ficar em branco"
       empty: "não pode ficar vazio"
       present: "deve ficar em branco"
       confirmation: "não é igual a %{attribute}"

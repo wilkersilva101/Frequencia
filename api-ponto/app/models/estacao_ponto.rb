@@ -10,8 +10,33 @@ class EstacaoPonto < ApplicationRecord
   # em uso pelo client desktop (ADR-0003: nenhuma mudança de protocolo).
   CODIGO_SISTEMA_OPERACIONAL_NAO_SUPORTADO = "SistemaOperacionalNaoSuportado".freeze
 
+  # Estrutura de dados replicada do legado Intranet (`presenca_estacaoponto`)
+  # (pedido direto do usuário, 2026-09-02 — ver SPRINT-PLAN.md).
+  has_many :registro_estacao_pontos, dependent: :destroy
+  has_many :estacao_pings, dependent: :destroy
+
   validates :descricao, presence: true
   validates :cod_ativacao, presence: true, uniqueness: { case_sensitive: false }
+
+  IP_PATTERN = /(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/
+
+  # Legado (`EstacaoPonto-explore.jsp`): a coluna VNC não é um campo próprio
+  # da estação, é o IP extraído do último `RegistroEstacaoPonto` recebido
+  # dela (`ep.ultimoRegistroEstacaoPonto.ipEnxuto`).
+  def ultimo_registro_estacao_ponto
+    if registro_estacao_pontos.loaded?
+      registro_estacao_pontos.max_by { |r| r.momento_sinc || Time.at(0) }
+    else
+      registro_estacao_pontos.order(momento_sinc: :desc).first
+    end
+  end
+
+  def vnc_ip
+    ip = ultimo_registro_estacao_ponto&.ip
+    return nil if ip.blank?
+
+    ip[IP_PATTERN]
+  end
 
   # Sprint 1 (Task 1.4): substitui a antiga whitelist hardcoded
   # (`%w[poc-ativacao-001 SistemaOperacionalNaoSuportado]`) por validação

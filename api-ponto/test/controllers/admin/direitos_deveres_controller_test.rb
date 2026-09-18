@@ -72,5 +72,40 @@ module Admin
 
       assert_redirected_to login_path
     end
+
+    # Task 23.10 (auditoria) — `sincronizar_agora` usa `authorize! :manage,
+    # AfastamentoCache` (task 23.7), mas não havia teste do caminho de
+    # acesso negado (só o de autenticação). Só admin tem `:manage` fora de
+    # TimeRecord/IntervencaoFrequencia (ver app/models/ability.rb).
+    test "usuario nao-admin nao deve sincronizar afastamentos" do
+      login_como_nao_admin
+
+      assert_no_enqueued_jobs(only: SincronizarAfastamentosJob) do
+        post sincronizar_agora_direitos_deveres_path
+      end
+
+      assert_redirected_to dashboard_path
+    end
+
+    test "gestor tambem nao deve sincronizar afastamentos (fora do escopo de manage do gestor)" do
+      delete logout_path
+      gestor = User.create!(nome_completo: "Gestor Teste", password: "123456")
+      gestor.add_role(:gestor)
+      post login_path, params: { username: gestor.username, password: "123456" }
+
+      assert_no_enqueued_jobs(only: SincronizarAfastamentosJob) do
+        post sincronizar_agora_direitos_deveres_path
+      end
+
+      assert_redirected_to dashboard_path
+    end
+
+    private
+
+    def login_como_nao_admin
+      delete logout_path
+      usuario_comum = User.create!(nome_completo: "Usuario Comum", password: "123456", admin: false)
+      post login_path, params: { username: usuario_comum.username, password: "123456" }
+    end
   end
 end

@@ -1,0 +1,46 @@
+<%# Task 23.8 — View real do Devise para login (Users::SessionsController#new).
+    Substitui o reuso temporário de "admin/sessions/new" (task 23.6). Mesmo
+    layout "login" e mesma identidade visual AdminLTE 4 da tela legada em
+    /login (Admin::SessionsController), mas o form submete para a rota
+    Devise (`session_path(resource_name)` -> /u/sign_in), que passa pelo
+    Warden e usa `User#find_for_database_authentication`/`#valid_password?`
+    (sobrescritos no model para rotear usuários com `cpf` para o Pessoas2 —
+    ver app/models/user.rb). Nenhuma lógica de autenticação é alterada aqui,
+    apenas a tela. %>
+<div class="card shadow-lg">
+  <div class="card-body p-5">
+    <div class="text-center mb-4">
+      <i class="fas fa-shield-halved fs-1 text-primary"></i>
+      <h3 class="mt-2">API Ponto TJPI</h3>
+      <p class="text-muted">Faça login no painel administrativo</p>
+    </div>
+
+    <% if flash[:alert] %>
+      <div class="alert alert-danger"><i class="fas fa-triangle-exclamation me-1"></i> <%= flash[:alert] %></div>
+    <% end %>
+
+    <%= form_for(resource, as: resource_name, url: session_path(resource_name), html: { data: { turbo: false } }) do |f| %>
+      <div class="mb-3">
+        <%= f.label :username, "Usuário", class: "form-label" %>
+        <div class="input-group">
+          <span class="input-group-text"><i class="fas fa-user"></i></span>
+          <%= f.text_field :username, class: "form-control", autofocus: true, placeholder: "nome.sobrenome" %>
+        </div>
+      </div>
+      <div class="mb-3">
+        <%= f.label :password, "Senha", class: "form-label" %>
+        <div class="input-group">
+          <span class="input-group-text"><i class="fas fa-lock"></i></span>
+          <%= f.password_field :password, class: "form-control", placeholder: "Sua senha", autocomplete: "current-password" %>
+        </div>
+      </div>
+      <% if devise_mapping.rememberable? %>
+        <div class="form-check mb-3">
+          <%= f.check_box :remember_me, class: "form-check-input" %>
+          <%= f.label :remember_me, "Lembrar de mim", class: "form-check-label" %>
+        </div>
+      <% end %>
+      <%= f.submit "Entrar", class: "btn btn-primary w-100" %>
+    <% end %>
+  </div>
+</div>

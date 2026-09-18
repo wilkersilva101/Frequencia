@@ -1,47 +1,61 @@
 require "test_helper"
 
 class ImportarDadosPessoaJobTest < ActiveJob::TestCase
-  # minitest 6 removeu Object#stub (agora é a gem separada minitest-mock,
-  # não incluída no projeto) — substitui a resposta do client Sticapi
-  # redefinindo o método de classe temporariamente, sem chamada HTTP real.
-  def stub_get_by_cpf(resposta)
-    SticapiClient::Pessoas.define_singleton_method(:get_by_cpf) { |*_args| resposta }
+  # Não usamos fixtures/dados reais no banco `pessoas` de teste porque o
+  # banco `pessoas_test` (conexão `pessoas:` em config/database.yml) existe
+  # mas NÃO tem schema carregado (é gerenciado pelo pessoas2, que roda em
+  # outro projeto — `database_tasks: false` aqui de propósito, ver
+  # app/models/pessoas_record.rb). Populá-lo por fora seria inventar dado
+  # num banco que não é nosso; em vez disso, stubamos o ponto de entrada
+  # (`Pessoas::Pessoa.find_by`) do jeito que este arquivo já stubava
+  # `SticapiClient::Pessoas.get_by_cpf` antes da task 8.13 — minitest 6
+  # removeu Object#stub (agora é a gem separada minitest-mock, não incluída
+  # no projeto), então redefinimos o método de classe temporariamente.
+  def stub_find_pessoa(pessoa)
+    Pessoas::Pessoa.define_singleton_method(:find_by) { |*_args| pessoa }
     yield
   ensure
-    SticapiClient::Pessoas.singleton_class.remove_method(:get_by_cpf)
+    Pessoas::Pessoa.singleton_class.remove_method(:find_by)
   end
 
-  test "atualiza nome_completo a partir do retorno da Sticapi" do
+  PessoaDouble = Struct.new(:id, :nome, :username, :vinculos_ativos, keyword_init: true)
+  VinculoDouble = Struct.new(:lotacao_principal, :tipo_vinculo, keyword_init: true)
+  LotacaoDouble = Struct.new(:unidade, keyword_init: true)
+  UnidadeDouble = Struct.new(:descricao, keyword_init: true)
+  TipoVinculoDouble = Struct.new(:nome, keyword_init: true)
+
+  def pessoa_realista(id: 42, nome: "Nome Atualizado Pessoas", orgao: "Vara Cível", vinculo: "Efetivo", username: nil)
+    vinculo_ativo = VinculoDouble.new(
+      lotacao_principal: orgao ? LotacaoDouble.new(unidade: UnidadeDouble.new(descricao: orgao)) : nil,
+      tipo_vinculo: vinculo ? TipoVinculoDouble.new(nome: vinculo) : nil
+    )
+    PessoaDouble.new(id: id, nome: nome, username: username, vinculos_ativos: [ vinculo_ativo ])
+  end
+
+  test "atualiza nome_completo a partir do Pessoas::Pessoa lido do banco" do
     user = User.create!(nome_completo: "Nome Antigo", password: "123456", cpf: "11122233344")
 
-    stub_get_by_cpf({ "nome" => "Nome Atualizado Pessoas" }) do
+    stub_find_pessoa(pessoa_realista(nome: "Nome Atualizado Pessoas")) do
       ImportarDadosPessoaJob.perform_now(user.id)
     end
 
     assert_equal "Nome Atualizado Pessoas", user.reload.nome_completo
   end
 
-  test "nao altera o usuario quando a Sticapi nao retorna dados" do
+  test "nao altera o usuario quando a pessoa nao e encontrada no banco do Pessoas" do
     user = User.create!(nome_completo: "Nome Antigo", password: "123456", cpf: "11122233344")
 
-    stub_get_by_cpf({}) do
+    stub_find_pessoa(nil) do
       ImportarDadosPessoaJob.perform_now(user.id)
     end
 
     assert_equal "Nome Antigo", user.reload.nome_completo
   end
 
-  test "faz upsert do FrequentadorCache a partir do retorno da Sticapi" do
+  test "faz upsert do FrequentadorCache a partir da pessoa lida do banco" do
     user = User.create!(nome_completo: "Nome Antigo", password: "123456", cpf: "11122233344")
 
-    payload_realista = {
-      "id" => 42,
-      "nome" => "Nome Atualizado Pessoas",
-      "lotacao_principal" => { "unidade" => { "descricao" => "Vara Cível" } },
-      "vinculos_ativos" => [ { "tipo_vinculo" => { "nome" => "Efetivo" } } ]
-    }
-
-    stub_get_by_cpf(payload_realista) do
+    stub_find_pessoa(pessoa_realista) do
       ImportarDadosPessoaJob.perform_now(user.id)
     end
 
@@ -54,10 +68,12 @@ class ImportarDadosPessoaJobTest < ActiveJob::TestCase
     assert cache.sincronizado_em.present?
   end
 
-  test "faz upsert do FrequentadorCache mesmo sem lotacao ou vinculo no retorno" do
+  test "faz upsert do FrequentadorCache mesmo sem lotacao ou vinculo ativo" do
     user = User.create!(nome_completo: "Nome Antigo", password: "123456", cpf: "11122233344")
 
-    stub_get_by_cpf({ "id" => 42, "nome" => "Nome Atualizado Pessoas" }) do
+    pessoa = PessoaDouble.new(id: 42, nome: "Nome Atualizado Pessoas", vinculos_ativos: [])
+
+    stub_find_pessoa(pessoa) do
       ImportarDadosPessoaJob.perform_now(user.id)
     end
 
@@ -71,7 +87,7 @@ class ImportarDadosPessoaJobTest < ActiveJob::TestCase
     user = User.create!(nome_completo: "Nome Antigo", password: "123456", cpf: "11122233344")
     FrequentadorCache.create!(cpf: "11122233344", nome: "Nome Bem Antigo", sincronizado_em: 1.day.ago)
 
-    stub_get_by_cpf({ "id" => 42, "nome" => "Nome Atualizado Pessoas" }) do
+    stub_find_pessoa(pessoa_realista(orgao: nil, vinculo: nil)) do
       ImportarDadosPessoaJob.perform_now(user.id)
     end
 
@@ -79,21 +95,21 @@ class ImportarDadosPessoaJobTest < ActiveJob::TestCase
     assert_equal "Nome Atualizado Pessoas", FrequentadorCache.find_by(cpf: "11122233344").nome
   end
 
-  test "nao cria FrequentadorCache quando a Sticapi nao retorna dados" do
+  test "nao cria FrequentadorCache quando a pessoa nao e encontrada" do
     user = User.create!(nome_completo: "Nome Antigo", password: "123456", cpf: "11122233344")
 
-    stub_get_by_cpf({}) do
+    stub_find_pessoa(nil) do
       ImportarDadosPessoaJob.perform_now(user.id)
     end
 
     assert_nil FrequentadorCache.find_by(cpf: "11122233344")
   end
 
-  test "mantem o FrequentadorCache antigo quando a Sticapi esta fora do ar" do
+  test "mantem o FrequentadorCache antigo quando a leitura do banco do Pessoas falha" do
     user = User.create!(nome_completo: "Nome Antigo", password: "123456", cpf: "11122233344")
     cache_antigo = FrequentadorCache.create!(cpf: "11122233344", nome: "Nome Antigo", orgao: "Orgao Antigo", vinculo: "Efetivo", sincronizado_em: 2.days.ago)
 
-    SticapiClient::Pessoas.define_singleton_method(:get_by_cpf) { |*_args| raise Net::OpenTimeout, "sticapi fora do ar" }
+    Pessoas::Pessoa.define_singleton_method(:find_by) { |*_args| raise PG::ConnectionBad, "banco do pessoas fora do ar" }
 
     assert_nothing_raised do
       ImportarDadosPessoaJob.perform_now(user.id)
@@ -102,16 +118,18 @@ class ImportarDadosPessoaJobTest < ActiveJob::TestCase
     assert_equal "Nome Antigo", user.reload.nome_completo
     assert_equal cache_antigo.attributes, FrequentadorCache.find(cache_antigo.id).attributes
   ensure
-    SticapiClient::Pessoas.singleton_class.remove_method(:get_by_cpf)
+    Pessoas::Pessoa.singleton_class.remove_method(:find_by)
   end
 
   test "ignora usuarios sem cpf ao rodar em lote" do
     sem_cpf = User.create!(nome_completo: "Sem CPF", password: "123456")
     chamou = false
 
-    stub_get_by_cpf({}) do
-      SticapiClient::Pessoas.define_singleton_method(:get_by_cpf) { |*_args| chamou = true; {} }
+    Pessoas::Pessoa.define_singleton_method(:find_by) { |*_args| chamou = true; nil }
+    begin
       ImportarDadosPessoaJob.perform_now
+    ensure
+      Pessoas::Pessoa.singleton_class.remove_method(:find_by)
     end
 
     assert_not chamou
@@ -130,9 +148,11 @@ class ImportarDadosPessoaJobTest < ActiveJob::TestCase
     begin
       outra_conexao.exec("SELECT pg_try_advisory_lock(#{ImportarDadosPessoaJob::LOCK_KEY})")
 
-      stub_get_by_cpf({}) do
-        SticapiClient::Pessoas.define_singleton_method(:get_by_cpf) { |*_args| chamou = true; {} }
+      Pessoas::Pessoa.define_singleton_method(:find_by) { |*_args| chamou = true; nil }
+      begin
         ImportarDadosPessoaJob.perform_now(user.id)
+      ensure
+        Pessoas::Pessoa.singleton_class.remove_method(:find_by)
       end
 
       assert_not chamou
