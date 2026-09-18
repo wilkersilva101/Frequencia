@@ -11,7 +11,7 @@
 
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
-    <h3 class="card-title"><i class="bi bi-funnel me-1"></i> Filtros</h3>
+    <h3 class="card-title"><i class="fas fa-filter me-1"></i> Filtros</h3>
   </div>
   <div class="card-body">
     <%= form_tag direitos_deveres_path, method: :get, class: "row g-2 align-items-end", data: { turbo: false } do %>
@@ -40,10 +40,10 @@
       </div>
       <div class="col-auto d-flex gap-1">
         <%= button_tag class: "btn btn-primary btn-sm" do %>
-          <i class="bi bi-search"></i> Filtrar
+          <i class="fas fa-magnifying-glass"></i> Filtrar
         <% end %>
         <%= link_to direitos_deveres_path, class: "btn btn-outline-secondary btn-sm" do %>
-          <i class="bi bi-x-lg"></i> Limpar
+          <i class="fas fa-xmark"></i> Limpar
         <% end %>
       </div>
     <% end %>
@@ -52,7 +52,7 @@
 
 <div class="card card-primary card-outline">
   <div class="card-header">
-    <h3 class="card-title"><i class="bi bi-journal-text me-1"></i> Lista de Direitos & Deveres</h3>
+    <h3 class="card-title"><i class="fas fa-book me-1"></i> Lista de Direitos & Deveres</h3>
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">

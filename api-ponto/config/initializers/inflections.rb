@@ -46,4 +46,10 @@ ActiveSupport::Inflector.inflections(:en) do |inflect|
   # português), quebrando o path helper `versao_path`/inferência de classe
   # de `Versao` a partir da tabela `versoes` (Sprint 14, Task 14.4).
   inflect.irregular "versao", "versoes"
+
+  # Mesmo problema de "categoria" (acima) — "frequencia" também termina em
+  # "-ia" e o Rails se recusa a pluralizar de novo, quebrando a inferência
+  # de tabela (`registro_mensal_frequencias`) do model
+  # `RegistroMensalFrequencia` (Sprint 17, task 17.1, 2026-09-03).
+  inflect.irregular "frequencia", "frequencias"
 end

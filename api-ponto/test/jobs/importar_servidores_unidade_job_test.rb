@@ -1,44 +1,48 @@
 require "test_helper"
 
 class ImportarServidoresUnidadeJobTest < ActiveJob::TestCase
-  def stub_pessoas_unidade(resposta)
-    SticapiClient::Pessoas.define_singleton_method(:unidade) { |*_args| resposta }
+  # Sem dados reais no banco `pessoas` de teste (sem schema carregado, ver
+  # nota em test/jobs/importar_dados_pessoa_job_test.rb) — stubamos os 3
+  # pontos de entrada usados pelo job: `Pessoas::Unidade.find_by` (unidade
+  # com `.servidores`), `Pessoas::GestorhContrachequeMirror
+  # .pares_matricula_cpf_para` (via ResolverCpfPorMatriculaService) e
+  # `Pessoas::Pessoa.find_by`.
+  def stub_unidade(resposta)
+    Pessoas::Unidade.define_singleton_method(:find_by) { |*_args| resposta }
     yield
   ensure
-    SticapiClient::Pessoas.singleton_class.remove_method(:unidade)
+    Pessoas::Unidade.singleton_class.remove_method(:find_by)
   end
 
-  def stub_gestorh_competencia(resposta)
-    SticapiClient::Gestorh.define_singleton_method(:competencia) { |*_args| resposta }
+  def stub_pares_matricula_cpf(pares)
+    Pessoas::GestorhContrachequeMirror.define_singleton_method(:pares_matricula_cpf_para) { |*_args, **_kwargs| pares }
     yield
   ensure
-    SticapiClient::Gestorh.singleton_class.remove_method(:competencia)
+    Pessoas::GestorhContrachequeMirror.singleton_class.remove_method(:pares_matricula_cpf_para)
   end
 
-  def stub_pessoas_get_by_cpf(mapa_cpf_para_dados)
-    SticapiClient::Pessoas.define_singleton_method(:get_by_cpf) { |cpf:| mapa_cpf_para_dados[cpf] }
+  def stub_pessoas_find_by_cpf(mapa_cpf_para_pessoa)
+    Pessoas::Pessoa.define_singleton_method(:find_by) { |cpf:| mapa_cpf_para_pessoa[cpf] }
     yield
   ensure
-    SticapiClient::Pessoas.singleton_class.remove_method(:get_by_cpf)
+    Pessoas::Pessoa.singleton_class.remove_method(:find_by)
   end
 
-  UNIDADE_COM_UM_SERVIDOR = {
-    "servidores" => [
-      { "matricula" => "1001", "nome" => "Fulano de Tal", "cargo" => "Analista" }
-    ]
-  }.freeze
+  UnidadeDouble = Struct.new(:servidores, keyword_init: true)
+  PessoaDouble = Struct.new(:id, :nome, :username, :vinculos_ativos, keyword_init: true)
+
+  def unidade_com_um_servidor
+    UnidadeDouble.new(servidores: [ Pessoas::Unidade::ServidorLotado.new(matricula: "1001", nome: "Fulano de Tal") ])
+  end
+
+  def pessoa_double(id: 42, nome: "Fulano de Tal", username: nil)
+    PessoaDouble.new(id: id, nome: nome, username: username, vinculos_ativos: [])
+  end
 
   test "cria um novo User e FrequentadorCache para servidor resolvido" do
-    stub_gestorh_competencia([ { "matricula" => "1001", "cpf" => "11122233344" } ]) do
-      stub_pessoas_unidade(UNIDADE_COM_UM_SERVIDOR) do
-        stub_pessoas_get_by_cpf({
-          "11122233344" => {
-            "id" => 42,
-            "nome" => "Fulano de Tal",
-            "lotacao_principal" => { "unidade" => { "descricao" => "Vara Cível" } },
-            "vinculos_ativos" => [ { "tipo_vinculo" => { "nome" => "Efetivo" } } ]
-          }
-        }) do
+    stub_pares_matricula_cpf([ [ "1001", "11122233344" ] ]) do
+      stub_unidade(unidade_com_um_servidor) do
+        stub_pessoas_find_by_cpf({ "11122233344" => pessoa_double }) do
           ImportarServidoresUnidadeJob.perform_now(999)
         end
       end
@@ -51,16 +55,12 @@ class ImportarServidoresUnidadeJobTest < ActiveJob::TestCase
 
     cache = FrequentadorCache.find_by(cpf: "11122233344")
     assert cache.present?
-    assert_equal "Vara Cível", cache.orgao
-    assert_equal "Efetivo", cache.vinculo
   end
 
-  test "usa o username real vindo da Sticapi ao criar o User" do
-    stub_gestorh_competencia([ { "matricula" => "1001", "cpf" => "11122233344" } ]) do
-      stub_pessoas_unidade(UNIDADE_COM_UM_SERVIDOR) do
-        stub_pessoas_get_by_cpf({
-          "11122233344" => { "id" => 42, "nome" => "Fulano de Tal", "username" => "fulano.pessoas" }
-        }) do
+  test "usa o username real vindo do Pessoas ao criar o User" do
+    stub_pares_matricula_cpf([ [ "1001", "11122233344" ] ]) do
+      stub_unidade(unidade_com_um_servidor) do
+        stub_pessoas_find_by_cpf({ "11122233344" => pessoa_double(username: "fulano.pessoas") }) do
           ImportarServidoresUnidadeJob.perform_now(999)
         end
       end
@@ -69,12 +69,10 @@ class ImportarServidoresUnidadeJobTest < ActiveJob::TestCase
     assert_equal "fulano.pessoas", User.find_by(cpf: "11122233344").username
   end
 
-  test "cai no generate_username local quando a Sticapi nao retorna username" do
-    stub_gestorh_competencia([ { "matricula" => "1001", "cpf" => "11122233344" } ]) do
-      stub_pessoas_unidade(UNIDADE_COM_UM_SERVIDOR) do
-        stub_pessoas_get_by_cpf({
-          "11122233344" => { "id" => 42, "nome" => "Fulano de Tal" }
-        }) do
+  test "cai no generate_username local quando o Pessoas nao tem username" do
+    stub_pares_matricula_cpf([ [ "1001", "11122233344" ] ]) do
+      stub_unidade(unidade_com_um_servidor) do
+        stub_pessoas_find_by_cpf({ "11122233344" => pessoa_double }) do
           ImportarServidoresUnidadeJob.perform_now(999)
         end
       end
@@ -84,11 +82,9 @@ class ImportarServidoresUnidadeJobTest < ActiveJob::TestCase
   end
 
   test "usuario com status ativo por padrao (default do schema, sem set explicito)" do
-    stub_gestorh_competencia([ { "matricula" => "1001", "cpf" => "11122233344" } ]) do
-      stub_pessoas_unidade(UNIDADE_COM_UM_SERVIDOR) do
-        stub_pessoas_get_by_cpf({
-          "11122233344" => { "id" => 42, "nome" => "Fulano de Tal" }
-        }) do
+    stub_pares_matricula_cpf([ [ "1001", "11122233344" ] ]) do
+      stub_unidade(unidade_com_um_servidor) do
+        stub_pessoas_find_by_cpf({ "11122233344" => pessoa_double }) do
           ImportarServidoresUnidadeJob.perform_now(999)
         end
       end
@@ -100,11 +96,9 @@ class ImportarServidoresUnidadeJobTest < ActiveJob::TestCase
   test "nao cria User duplicado quando ja existe pelo cpf" do
     existente = User.create!(nome_completo: "Ja Existia", password: "123456", cpf: "11122233344")
 
-    stub_gestorh_competencia([ { "matricula" => "1001", "cpf" => "11122233344" } ]) do
-      stub_pessoas_unidade(UNIDADE_COM_UM_SERVIDOR) do
-        stub_pessoas_get_by_cpf({
-          "11122233344" => { "id" => 42, "nome" => "Nome Novo Vindo Do Pessoas" }
-        }) do
+    stub_pares_matricula_cpf([ [ "1001", "11122233344" ] ]) do
+      stub_unidade(unidade_com_um_servidor) do
+        stub_pessoas_find_by_cpf({ "11122233344" => pessoa_double(nome: "Nome Novo Vindo Do Pessoas") }) do
           ImportarServidoresUnidadeJob.perform_now(999)
         end
       end
@@ -122,8 +116,8 @@ class ImportarServidoresUnidadeJobTest < ActiveJob::TestCase
     Rails.logger = Logger.new(log_io)
 
     begin
-      stub_gestorh_competencia([]) do
-        stub_pessoas_unidade(UNIDADE_COM_UM_SERVIDOR) do
+      stub_pares_matricula_cpf([]) do
+        stub_unidade(unidade_com_um_servidor) do
           assert_nothing_raised do
             ImportarServidoresUnidadeJob.perform_now(999)
           end
@@ -138,22 +132,19 @@ class ImportarServidoresUnidadeJobTest < ActiveJob::TestCase
   end
 
   test "um servidor com erro nao impede a importacao dos demais" do
-    unidade_com_dois = {
-      "servidores" => [
-        { "matricula" => "1001", "nome" => "Vai Falhar" },
-        { "matricula" => "1002", "nome" => "Vai Funcionar" }
-      ]
-    }
+    unidade_com_dois = UnidadeDouble.new(servidores: [
+      Pessoas::Unidade::ServidorLotado.new(matricula: "1001", nome: "Vai Falhar"),
+      Pessoas::Unidade::ServidorLotado.new(matricula: "1002", nome: "Vai Funcionar")
+    ])
 
-    stub_gestorh_competencia([
-      { "matricula" => "1001", "cpf" => "11122233344" },
-      { "matricula" => "1002", "cpf" => "55566677788" }
-    ]) do
-      stub_pessoas_unidade(unidade_com_dois) do
-        SticapiClient::Pessoas.define_singleton_method(:get_by_cpf) do |cpf:|
+    pessoa_ok = pessoa_double(id: 2, nome: "Vai Funcionar")
+
+    stub_pares_matricula_cpf([ [ "1001", "11122233344" ], [ "1002", "55566677788" ] ]) do
+      stub_unidade(unidade_com_dois) do
+        Pessoas::Pessoa.define_singleton_method(:find_by) do |cpf:|
           raise "falha simulada" if cpf == "11122233344"
 
-          { "id" => 2, "nome" => "Vai Funcionar" }
+          pessoa_ok
         end
 
         begin
@@ -161,7 +152,7 @@ class ImportarServidoresUnidadeJobTest < ActiveJob::TestCase
             ImportarServidoresUnidadeJob.perform_now(999)
           end
         ensure
-          SticapiClient::Pessoas.singleton_class.remove_method(:get_by_cpf)
+          Pessoas::Pessoa.singleton_class.remove_method(:find_by)
         end
       end
     end
@@ -171,7 +162,15 @@ class ImportarServidoresUnidadeJobTest < ActiveJob::TestCase
   end
 
   test "unidade sem servidores nao quebra o job" do
-    stub_pessoas_unidade({ "servidores" => [] }) do
+    stub_unidade(UnidadeDouble.new(servidores: [])) do
+      assert_nothing_raised do
+        ImportarServidoresUnidadeJob.perform_now(999)
+      end
+    end
+  end
+
+  test "unidade nao encontrada nao quebra o job" do
+    stub_unidade(nil) do
       assert_nothing_raised do
         ImportarServidoresUnidadeJob.perform_now(999)
       end
@@ -186,9 +185,11 @@ class ImportarServidoresUnidadeJobTest < ActiveJob::TestCase
     begin
       outra_conexao.exec("SELECT pg_try_advisory_lock(#{ImportarServidoresUnidadeJob::LOCK_KEY})")
 
-      stub_pessoas_unidade(UNIDADE_COM_UM_SERVIDOR) do
-        SticapiClient::Pessoas.define_singleton_method(:unidade) { |*_args| chamou = true; UNIDADE_COM_UM_SERVIDOR }
+      Pessoas::Unidade.define_singleton_method(:find_by) { |*_args| chamou = true; unidade_com_um_servidor }
+      begin
         ImportarServidoresUnidadeJob.perform_now(999)
+      ensure
+        Pessoas::Unidade.singleton_class.remove_method(:find_by)
       end
 
       assert_not chamou

@@ -86,7 +86,9 @@ module Admin
 
       get new_versao_path
 
-      assert_redirected_to versoes_path
+      # Task 23.7 — CanCanCan: acesso negado redireciona para o dashboard
+      # (rescue_from CanCan::AccessDenied), não mais para o recurso.
+      assert_redirected_to dashboard_path
     end
 
     test "usuario nao-admin nao deve criar versao" do
@@ -95,7 +97,7 @@ module Admin
       assert_no_difference("Versao.count") do
         post versoes_path, params: { versao: { numero: "3.0.0" } }
       end
-      assert_redirected_to versoes_path
+      assert_redirected_to dashboard_path
     end
 
     test "usuario nao-admin nao deve acessar formulario de edicao" do
@@ -104,7 +106,7 @@ module Admin
       versao = Versao.create!(numero: "1.0.0")
       get edit_versao_path(versao)
 
-      assert_redirected_to versoes_path
+      assert_redirected_to dashboard_path
     end
 
     private

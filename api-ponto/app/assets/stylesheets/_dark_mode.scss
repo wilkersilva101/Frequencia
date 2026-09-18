@@ -1,0 +1,71 @@
+// ============================================================
+// MODO ESCURO — sobreposições de componentes
+// Portado de basic8/app/assets/stylesheets/application.scss
+// (bloco "MODO ESCURO", linhas ~192-300 no basic8, Sprint 24.3)
+//
+// $enable-dark-mode NÃO é uma flag própria do Frequencia nem do basic8:
+// é uma variável nativa do Bootstrap 5.3 (node_modules/bootstrap/scss/
+// _variables.scss, `$enable-dark-mode: true !default;`). A nota da
+// task 24.2 ("_variables.scss do Frequencia não define $enable-dark-mode")
+// descrevia um sintoma, não a causa raiz: o basic8 também não a define
+// em seu _variables.scss — ele apenas usa a variável depois de importar
+// "bootstrap/scss/bootstrap" no application.scss, ponto em que o default
+// do Bootstrap já está disponível. Por isso este arquivo NÃO redefine
+// $enable-dark-mode em _variables.scss: basta garantir que este import
+// entre em application.scss depois de "bootstrap/scss/bootstrap" (ver
+// application.scss), preservando o default `true` do Bootstrap.
+//
+// Trechos do bloco "MODO ESCURO" do basic8 DELIBERADAMENTE NÃO portados
+// (mesmo critério da task 24.2 — dependências ausentes do package.json
+// do Frequencia, task 24.1 decidiu não replicá-las):
+// - tom-select dark mode (.ts-wrapper, .ts-control, .ts-dropdown, .ts-item)
+// - toastr dark mode (#toast-container e variações .toast-success/error/...)
+// - CKEditor 5 dark mode (.ck-editor__*, .ck-toolbar, .ck-content, .ck-bottom)
+// ============================================================
+@if $enable-dark-mode {
+  @include color-mode(dark) {
+    .card {
+      --bs-card-bg: #1a1d23;
+      --bs-card-cap-bg: #22262e;
+      --bs-card-border-color: #374151;
+    }
+
+    .table {
+      --bs-table-striped-bg: rgba(255, 255, 255, 0.035);
+      --bs-table-hover-bg: rgba(255, 255, 255, 0.07);
+    }
+
+    .form-control,
+    .form-select {
+      background-color: #1a1d23;
+      border-color: #374151;
+    }
+
+    .pagination {
+      --bs-pagination-bg: #1a1d23;
+      --bs-pagination-border-color: #374151;
+      --bs-pagination-hover-bg: #22262e;
+      --bs-pagination-hover-border-color: #374151;
+    }
+
+    .bg-light {
+      background-color: rgba(55, 65, 81, var(--bs-bg-opacity, 1)) !important;
+    }
+
+    .btn-light {
+      --bs-btn-color: #f1f5f9;
+      --bs-btn-bg: #374151;
+      --bs-btn-border-color: #4b5563;
+      --bs-btn-hover-color: #fff;
+      --bs-btn-hover-bg: #4b5563;
+      --bs-btn-hover-border-color: #6b7280;
+      --bs-btn-active-color: #fff;
+      --bs-btn-active-bg: #4b5563;
+      --bs-btn-active-border-color: #6b7280;
+    }
+
+    .app-content-header {
+      background-color: transparent !important;
+    }
+  }
+}

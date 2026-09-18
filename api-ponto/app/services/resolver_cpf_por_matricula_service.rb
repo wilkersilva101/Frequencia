@@ -1,10 +1,15 @@
 # Resolve matrícula(s) em CPF a partir da folha de uma competência do
-# GestoRH (via sticapi_client) — necessário porque a listagem de servidores
-# de uma unidade (SticapiClient::Pessoas.unidade) não traz CPF, só matrícula.
-# Ver SPRINT-PLAN.md, Sprint 10B, e docs/integracao-pessoas-sticapi.md.
+# GestoRH — lida diretamente da tabela `gestorh_contracheque_mirrors` do
+# banco do Pessoas (task 8.13), que é o mesmo espelho local que alimentava
+# `SticapiClient::Gestorh.competencia(mes:, ano:)` via HTTP. Necessário
+# porque a listagem de servidores de uma unidade (Pessoas::Lotacao) não
+# traz CPF, só matrícula (a tabela `pessoas` é que tem `cpf`, e o vínculo
+# entre matrícula-da-folha e pessoa só existe garantidamente dentro de uma
+# competência específica).
 #
-# Não persiste a competência inteira (~4700 registros) no banco — o mapa
-# matricula => cpf vive só na memória da instância (escopo de um job).
+# Não persiste a competência inteira (~4700 registros) no banco do
+# Frequencia — o mapa matricula => cpf vive só na memória da instância
+# (escopo de um job).
 class ResolverCpfPorMatriculaService
   def self.call(matriculas, mes:, ano:)
     new(mes: mes, ano: ano).call(matriculas)
@@ -43,14 +48,14 @@ class ResolverCpfPorMatriculaService
 
   private
 
+  # Não filtramos por `orgao_id`: o pessoas2 tem múltiplas competências
+  # (uma por órgão) para o mesmo mês/ano, mas a chamada Sticapi original
+  # também não recebia/filtrava por órgão (a API já respondia escopada).
+  # Ver nota em app/models/pessoas/competencia.rb.
   def mapa_completo
-    @mapa_completo ||= begin
-      folha = SticapiClient::Gestorh.competencia(mes: @mes, ano: @ano)
-      Array(folha).each_with_object({}) do |pessoa, memo|
-        matricula = pessoa["matricula"]
-        cpf = pessoa["cpf"]
+    @mapa_completo ||= Pessoas::GestorhContrachequeMirror.pares_matricula_cpf_para(mes: @mes, ano: @ano)
+      .each_with_object({}) do |(matricula, cpf), memo|
         memo[matricula.to_s] = cpf if matricula.present? && cpf.present?
       end
-    end
   end
 end

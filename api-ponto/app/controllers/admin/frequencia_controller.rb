@@ -1,6 +1,10 @@
 module Admin
   class FrequenciaController < Admin::ApplicationController
     def index
+      # Task 23.7 — CanCanCan: autorização explícita para leitura.
+      # Admin/gestor/operador podem visualizar (todos têm :read em :all).
+      authorize! :read, :all
+
       @registros = TimeRecord.includes(:user, :estacao_ponto).order(punched_at: :desc)
 
       if params[:data].present? && data_filtro

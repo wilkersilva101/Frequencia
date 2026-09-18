@@ -6,22 +6,32 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     post login_path, params: { username: @admin.username, password: "123456" }
   end
 
+  # Pedido do usuário (2026-09-02): index passou a listar
+  # Pessoas::Vinculo.ativos (mesmo padrão de admin/frequentadores, task
+  # 10.10) em vez de só User.order(:nome_completo). pessoas_test não tem
+  # schema carregado (task 8.13) — stuba o ponto de entrada, mesmo padrão
+  # já usado em frequentadores_controller_test.rb.
   test "deve listar usuarios" do
+    Pessoas::Vinculo.define_singleton_method(:frequentadores_ativos) { |**_kwargs| Kaminari.paginate_array([]).page(1) }
+
     get users_path
+
     assert_response :success
+  ensure
+    Pessoas::Vinculo.singleton_class.remove_method(:frequentadores_ativos)
   end
 
-  test "deve mostrar formulario de novo usuario" do
-    get new_user_path
-    assert_response :success
-    assert_select ".app-content-header h1", "Novo Usuário"
-  end
+  test "usuario local sem cpf aparece na secao separada, mesmo sem vinculo no pessoas2" do
+    Pessoas::Vinculo.define_singleton_method(:frequentadores_ativos) { |**_kwargs| Kaminari.paginate_array([]).page(1) }
+    sem_cpf = User.create!(nome_completo: "Admin Sem Vinculo", password: "123456")
 
-  test "deve criar usuario" do
-    assert_difference("User.count") do
-      post users_path, params: { user: { nome_completo: "Novo Usuário", password: "123456", password_confirmation: "123456" } }
-    end
-    assert_redirected_to users_path
+    get users_path
+
+    assert_response :success
+    assert_select "td", text: "Admin Sem Vinculo"
+    assert_select "code", text: sem_cpf.username
+  ensure
+    Pessoas::Vinculo.singleton_class.remove_method(:frequentadores_ativos)
   end
 
   test "deve mostrar formulario de edicao" do
@@ -66,33 +76,33 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Vindo Do Pessoas", user.reload.nome_completo
   end
 
-  test "deve inativar usuario" do
-    user = User.create!(nome_completo: "Inativável", password: "123456")
-    delete user_path(user)
-    assert_redirected_to users_path
-    assert_equal 0, user.reload.status
+  # Task 21.7 (auditoria de cobertura): a 21.6 removeu new/create/destroy/
+  # purge de config/routes.rb e do controller, mas não havia teste
+  # confirmando que essas rotas realmente não existem mais (só os testes
+  # antigos de new/create/destroy/purge foram removidos, não substituídos
+  # por uma prova negativa). `resources :users, only: [:index, :update]`
+  # não gera os helpers de path pra ações fora dessa lista — chamar um
+  # helper inexistente levanta NoMethodError, o mesmo teste orientado pelo
+  # dev.
+  test "helpers de rota para criacao/exclusao manual nao existem mais" do
+    assert_raises(NameError) { new_user_path }
+    assert_raises(NameError) { purge_user_path(@admin) }
   end
 
-  test "deve excluir usuario inativo sem registros" do
-    user = User.create!(nome_completo: "Excluível", password: "123456", status: 0)
-    assert_difference("User.count", -1) do
-      delete purge_user_path(user)
-    end
-    assert_redirected_to users_path
+  # Complementa o teste acima com a prova em nível de HTTP: mesmo sem o
+  # helper, uma requisição direta pros verbos/paths que existiam antes da
+  # 21.6 não deve mais casar com nenhuma rota. `show_exceptions = :rescuable`
+  # (config/environments/test.rb) faz o Rails converter o RoutingError numa
+  # resposta 404 em vez de deixá-lo propagar como exceção.
+  test "POST direto em users_path (criacao manual) nao casa com nenhuma rota" do
+    post "/users", params: { user: { nome_completo: "Tentativa" } }
+    assert_response :not_found
   end
 
-  test "nao deve excluir usuario ativo" do
-    user = User.create!(nome_completo: "Ativo", password: "123456")
-    delete purge_user_path(user)
-    assert_redirected_to users_path
-    assert_not_nil User.find_by(id: user.id)
-  end
+  test "DELETE direto em user_path (exclusao manual) nao casa com nenhuma rota" do
+    user = User.create!(nome_completo: "Para Excluir", password: "123456")
 
-  test "nao deve excluir usuario inativo com registros de ponto" do
-    user = User.create!(nome_completo: "Com Registro", password: "123456", status: 0)
-    TimeRecord.create!(user: user, raw_data: "abc", punched_at: Time.zone.now, authentication_mode: "manual")
-    delete purge_user_path(user)
-    assert_redirected_to users_path
-    assert_not_nil User.find_by(id: user.id)
+    delete "/users/#{user.id}"
+    assert_response :not_found
   end
 end

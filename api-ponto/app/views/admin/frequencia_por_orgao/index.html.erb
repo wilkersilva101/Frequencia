@@ -2,7 +2,7 @@
 
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
-    <h3 class="card-title"><i class="bi bi-funnel me-1"></i> Filtros</h3>
+    <h3 class="card-title"><i class="fas fa-filter me-1"></i> Filtros</h3>
   </div>
   <div class="card-body">
     <%= form_tag frequencia_por_orgao_path, method: :get, class: "row g-2 align-items-end", data: { turbo: false } do %>
@@ -23,10 +23,10 @@
       </div>
       <div class="col-auto d-flex gap-1">
         <%= button_tag class: "btn btn-primary btn-sm" do %>
-          <i class="bi bi-search"></i> Filtrar
+          <i class="fas fa-magnifying-glass"></i> Filtrar
         <% end %>
         <%= link_to frequencia_por_orgao_path, class: "btn btn-outline-secondary btn-sm" do %>
-          <i class="bi bi-x-lg"></i> Limpar
+          <i class="fas fa-xmark"></i> Limpar
         <% end %>
       </div>
     <% end %>
@@ -35,7 +35,7 @@
 
 <div class="card card-primary card-outline">
   <div class="card-header">
-    <h3 class="card-title"><i class="bi bi-file-earmark-text me-1"></i> Frequência por Órgão</h3>
+    <h3 class="card-title"><i class="fas fa-file-lines me-1"></i> Frequência por Órgão</h3>
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">

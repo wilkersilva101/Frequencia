@@ -1,0 +1,8 @@
+admin:
+  name: "admin"
+
+gestor:
+  name: "gestor"
+
+operador:
+  name: "operador"

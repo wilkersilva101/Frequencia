@@ -4,12 +4,14 @@
 # tenha cadastrado o CPF manualmente (diferença central em relação ao
 # ImportarDadosPessoaJob, que só atualiza quem já existe).
 #
-# Fluxo: SticapiClient::Pessoas.unidade(id:) dá a lista de servidores
-# (matrícula, nome, cargo — sem CPF) → ResolverCpfPorMatriculaService
-# resolve CPF via folha do GestoRH → SticapiClient::Pessoas.get_by_cpf traz
-# os dados completos de cada um → upsert em User/FrequentadorCache.
+# Fluxo (task 8.13 — leitura direta do Postgres do Pessoas, substitui
+# Sticapi): `Pessoas::Unidade#servidores` (lotação principal e vigente) dá a
+# lista de servidores (matrícula, nome — sem CPF, igual antes) →
+# ResolverCpfPorMatriculaService resolve CPF via folha do GestoRH →
+# `Pessoas::Pessoa.find_by(cpf:)` traz os dados completos de cada um →
+# upsert em User/FrequentadorCache.
 #
-# Ver SPRINT-PLAN.md, Sprint 10B, e docs/integracao-pessoas-sticapi.md.
+# Ver SPRINT-PLAN.md, Sprint 10B e Sprint 8 (task 8.13).
 class ImportarServidoresUnidadeJob < ApplicationJob
   queue_as :default
 
@@ -39,18 +41,20 @@ class ImportarServidoresUnidadeJob < ApplicationJob
   end
 
   def importar_unidade(unidade_id)
-    unidade = SticapiClient::Pessoas.unidade(id: unidade_id)
-    servidores = Array(unidade&.dig("servidores"))
+    unidade = Pessoas::Unidade.find_by(id: unidade_id)
+    return if unidade.blank?
+
+    servidores = unidade.servidores
     return if servidores.blank?
 
-    matriculas = servidores.filter_map { |servidor| servidor["matricula"] }
+    matriculas = servidores.filter_map(&:matricula)
     cpf_por_matricula = ResolverCpfPorMatriculaService.mais_recente(matriculas)
 
     servidores.each do |servidor|
-      cpf = cpf_por_matricula[servidor["matricula"].to_s]
+      cpf = cpf_por_matricula[servidor.matricula.to_s]
 
       if cpf.blank?
-        Rails.logger.warn("[ImportarServidoresUnidadeJob] Matrícula #{servidor["matricula"]} não resolvida em CPF (não encontrada na competência atual nem na anterior) — servidor pulado")
+        Rails.logger.warn("[ImportarServidoresUnidadeJob] Matrícula #{servidor.matricula} não resolvida em CPF (não encontrada na competência atual nem na anterior) — servidor pulado")
         next
       end
 
@@ -59,17 +63,17 @@ class ImportarServidoresUnidadeJob < ApplicationJob
   end
 
   def importar_servidor(cpf)
-    dados = SticapiClient::Pessoas.get_by_cpf(cpf: cpf)
-    return if dados.blank? || dados["nome"].blank?
+    pessoa = Pessoas::Pessoa.find_by(cpf: cpf)
+    return if pessoa.blank? || pessoa.nome.blank?
 
-    criar_user_se_necessario(cpf, dados)
-    AtualizarFrequentadorCacheService.call(cpf: cpf, dados: dados)
+    criar_user_se_necessario(cpf, pessoa)
+    AtualizarFrequentadorCacheService.call(cpf: cpf, pessoa: pessoa)
   rescue StandardError => e
     Rails.logger.error("[ImportarServidoresUnidadeJob] Falha ao importar CPF #{cpf}: #{e.message}")
   end
 
   # Decisões registradas na Sprint 10B/21 sobre campos que o User exige mas
-  # a Sticapi não supre diretamente:
+  # o Pessoas não supre diretamente:
   #
   # - password: aleatória/inutilizável (SecureRandom) — ninguém a conhece,
   #   é só um placeholder para satisfazer `has_secure_password`. Login local
@@ -77,22 +81,22 @@ class ImportarServidoresUnidadeJob < ApplicationJob
   #   Sprint 21 substituir a autenticação por `sticapi_authenticatable`
   #   (login/senha reais do Pessoas, mecanismo já confirmado tecnicamente).
   #   Biometria continua funcionando (não depende de senha).
-  # - username: usa o `username` real vindo do payload da Sticapi
-  #   (`dados["username"]`) — mesmo campo que o próprio pessoas2 usa para
+  # - username: usa o `username` real da tabela `pessoas`
+  #   (`pessoa.username`) — mesmo campo que o próprio pessoas2 usa para
   #   vincular seu User a Pessoa (`has_one :pessoa, foreign_key: "username",
   #   primary_key: "username"`). Só cai no `generate_username` local
-  #   (callback já existente no model) quando a Sticapi não retorna
-  #   username — não sobrescreve o de quem já existe (só se aplica na
+  #   (callback já existente no model) quando o Pessoas não tem username
+  #   preenchido — não sobrescreve o de quem já existe (só se aplica na
   #   criação, ver método `new_record?` abaixo).
   # - status: usa o default do schema (`status: 1`, ativo) — não setado
   #   explicitamente aqui de propósito, para não duplicar a regra do
   #   banco/model.
-  def criar_user_se_necessario(cpf, dados)
+  def criar_user_se_necessario(cpf, pessoa)
     user = User.find_or_initialize_by(cpf: cpf)
     return unless user.new_record?
 
-    user.nome_completo = dados["nome"]
-    user.username = dados["username"] if dados["username"].present?
+    user.nome_completo = pessoa.nome
+    user.username = pessoa.username if pessoa.username.present?
     user.password = SecureRandom.hex(16)
     user.save!
   end

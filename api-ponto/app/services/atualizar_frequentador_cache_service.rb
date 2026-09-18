@@ -1,28 +1,29 @@
-# Upsert do espelho local (FrequentadorCache) a partir de um payload de
-# SticapiClient::Pessoas.get_by_cpf. Extraído de ImportarDadosPessoaJob para
-# ser reaproveitado também por ImportarServidoresUnidadeJob (Sprint 10B).
+# Upsert do espelho local (FrequentadorCache) a partir de um `Pessoas::Pessoa`
+# lido diretamente do banco do Pessoas (task 8.13 — substitui o payload de
+# `SticapiClient::Pessoas.get_by_cpf`). Extraído de ImportarDadosPessoaJob
+# para ser reaproveitado também por ImportarServidoresUnidadeJob (Sprint
+# 10B).
 #
-# Formato de orgao/vinculo confirmado em 2026-08-28 contra um CPF real de
-# teste (ver SPRINT-PLAN.md, Sprint 10, task 10.3):
-#   lotacao_principal.unidade.descricao → nome do órgão/unidade
-#   vinculos_ativos[0].tipo_vinculo.nome → tipo de vínculo (Efetivo,
-#   Comissionado, etc.) — usa o primeiro vínculo ativo; uma pessoa pode ter
-#   mais de um vínculo simultâneo, mas o cache guarda só o principal.
-#
-# Achado real na Sprint 10B (task 10B.10, validação em massa contra ~87
-# servidores): quando a pessoa tem só 1 vínculo ativo, a Sticapi serializa
-# `vinculos_ativos` como um Hash único (o próprio vínculo), não um Array de
-# 1 item — inconsistência da API entre "1 vínculo" e "vários vínculos".
-# `Array.wrap` normaliza os dois casos (Hash não responde a `to_ary`, então
-# vira `[hash]`; Array já vem como está).
+# Histórico (Sprint 10, task 10.3 / Sprint 10B, task 10B.10, formato
+# confirmado via HTTP Sticapi): `lotacao_principal.unidade.descricao` dava
+# o nome do órgão/unidade, e `vinculos_ativos` vinha ora como Hash único
+# (pessoa com 1 vínculo ativo), ora como Array (vários vínculos) —
+# inconsistência de serialização da própria API, normalizada com
+# `Array.wrap`. Essa inconsistência não existe mais aqui: `Pessoas::Pessoa
+# #vinculos_ativos` é sempre uma relação ActiveRecord, e `Pessoas::Vinculo
+# #lotacao_principal`/`#tipo_vinculo` leem as colunas reais
+# (`lotacoes.principal`, `vinculos.configuracao_cadastro_id` →
+# `tipos_vinculo.nome`) — ver app/models/pessoas/*.rb.
 class AtualizarFrequentadorCacheService
-  def self.call(cpf:, dados:)
+  def self.call(cpf:, pessoa:)
+    vinculo_ativo = pessoa.vinculos_ativos.first
+
     FrequentadorCache.find_or_initialize_by(cpf: cpf).tap do |cache|
       cache.update!(
-        pessoa_id_pessoas: dados["id"],
-        nome: dados["nome"],
-        orgao: dados.dig("lotacao_principal", "unidade", "descricao"),
-        vinculo: Array.wrap(dados["vinculos_ativos"]).first&.dig("tipo_vinculo", "nome"),
+        pessoa_id_pessoas: pessoa.id,
+        nome: pessoa.nome,
+        orgao: vinculo_ativo&.lotacao_principal&.unidade&.descricao,
+        vinculo: vinculo_ativo&.tipo_vinculo&.nome,
         sincronizado_em: Time.current
       )
     end

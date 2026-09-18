@@ -17,7 +17,7 @@
           <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
         </svg>
         <%= link_to frequentadores_path, class: "small-box-footer" do %>
-          Ver detalhes <i class="bi bi-arrow-right"></i>
+          Ver detalhes <i class="fas fa-arrow-right"></i>
         <% end %>
       </div>
     </div>
@@ -32,7 +32,7 @@
           <path d="M4 6h16v10H4V6zm0-2a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h6v2H8v2h8v-2h-2v-2h6a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4z"/>
         </svg>
         <%= link_to estacoes_path, class: "small-box-footer" do %>
-          Ver detalhes <i class="bi bi-arrow-right"></i>
+          Ver detalhes <i class="fas fa-arrow-right"></i>
         <% end %>
       </div>
     </div>
@@ -47,7 +47,7 @@
           <path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1h8zm-7.978-1h7.956a.274.274 0 0 0 .014-.002l.008-.002c-.003-.064-.025-.134-.062-.218a3.748 3.748 0 0 0-.592-.712c-.366-.36-1.002-.803-2.29-1.066C10.905 10.692 9.762 10.5 8.5 10.5s-2.405.192-3.048.424c-1.288.263-1.924.706-2.29 1.066a3.747 3.747 0 0 0-.654.93c-.037.084-.059.154-.062.218l.008.002a.276.276 0 0 0 .014.002h7.956zM8.5 4.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/>
         </svg>
         <%= link_to users_path, class: "small-box-footer" do %>
-          Ver detalhes <i class="bi bi-arrow-right"></i>
+          Ver detalhes <i class="fas fa-arrow-right"></i>
         <% end %>
       </div>
     </div>
@@ -88,7 +88,7 @@
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/>
         </svg>
         <%= link_to time_records_path(start_date: Date.current), class: "small-box-footer" do %>
-          Ver registros de hoje <i class="bi bi-arrow-right"></i>
+          Ver registros de hoje <i class="fas fa-arrow-right"></i>
         <% end %>
       </div>
     </div>
@@ -108,7 +108,7 @@
               <h3 class="mb-0"><%= @registros_semana %></h3>
             </div>
             <div class="text-secondary">
-              <i class="bi bi-calendar-week fs-1"></i>
+              <i class="fas fa-calendar-week fs-1"></i>
             </div>
           </div>
         </div>
@@ -124,7 +124,7 @@
               <h3 class="mb-0"><%= @registros_mes %></h3>
             </div>
             <div class="text-secondary">
-              <i class="bi bi-calendar-month fs-1"></i>
+              <i class="fas fa-calendar-days fs-1"></i>
             </div>
           </div>
         </div>
@@ -140,7 +140,23 @@
               <h3 class="mb-0"><%= @usuarios_inativos %></h3>
             </div>
             <div class="text-secondary">
-              <i class="bi bi-person-slash fs-1"></i>
+              <i class="fas fa-user-slash fs-1"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <p class="text-secondary mb-1">Faltas no Mês</p>
+              <h3 class="mb-0"><%= @faltas_mes %></h3>
+            </div>
+            <div class="text-secondary">
+              <i class="fas fa-calendar-xmark fs-1"></i>
             </div>
           </div>
         </div>
@@ -151,9 +167,9 @@
   <!-- Últimas Batidas -->
   <div class="card card-primary card-outline">
     <div class="card-header d-flex justify-content-between align-items-center">
-      <h3 class="card-title mb-0"><i class="bi bi-clock-history me-1"></i> Últimas Batidas</h3>
+      <h3 class="card-title mb-0"><i class="fas fa-clock-rotate-left me-1"></i> Últimas Batidas</h3>
       <%= link_to time_records_path, class: "btn btn-sm btn-outline-secondary" do %>
-        Ver todas <i class="bi bi-arrow-right"></i>
+        Ver todas <i class="fas fa-arrow-right"></i>
       <% end %>
     </div>
     <div class="card-body p-0">
@@ -211,11 +227,11 @@
 <% else %>
   <div class="row justify-content-center py-5">
     <div class="col-md-6 text-center">
-      <i class="bi bi-person-circle fs-1 text-muted mb-3 d-block"></i>
+      <i class="fas fa-circle-user fs-1 text-muted mb-3 d-block"></i>
       <h2>Bem-vindo, <%= current_user.nome_completo %>!</h2>
       <p class="text-muted mb-4">Acompanhe seus registros de ponto.</p>
       <%= link_to time_records_path, class: "btn btn-primary btn-lg" do %>
-        <i class="bi bi-clock-history"></i> Meus Registros de Ponto
+        <i class="fas fa-clock-rotate-left"></i> Meus Registros de Ponto
       <% end %>
     </div>
   </div>

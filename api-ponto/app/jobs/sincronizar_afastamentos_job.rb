@@ -1,15 +1,17 @@
 # Sincronização de Direitos/Deveres (Sprint 12): espelha afastamentos do
-# sistema Pessoas via sticapi_client, para cada User com `cpf` preenchido.
+# sistema Pessoas, para cada User com `cpf` preenchido.
 #
-# Endpoint real: SticapiClient::Intranet.afastamentos (não é
-# SticapiClient::Pessoas, como o plano original supunha antes de
-# confirmado) — retorna [{id pessoa_id pessoa_nome pessoa_cpf afastamento
-# inicio fim fim_vinculo tipo_desvinculacao}], documentado na própria gem.
+# Fonte real (task 8.13 — leitura direta do Postgres do Pessoas, substitui
+# `SticapiClient::Intranet.afastamentos`): tabela `afastamentos`, ligada a
+# `vinculos` → `pessoas` (por CPF). A coluna `afastamentos.id_intranet` é o
+# mesmo `id` que o endpoint HTTP da Intranet retornava (confirmado contra
+# dados reais na task 8.13) — continua sendo a chave usada em
+# `AfastamentoCache#afastamento_id_pessoas`.
 #
-# `cargo`/`lotacao`/`status` do AfastamentoCache (task 12.1) NÃO vêm nesse
-# payload — ficam nil por enquanto. Não inventamos de onde tirar esses
-# campos; se forem necessários, precisam de investigação futura (talvez
-# outro endpoint, ou junção com FrequentadorCache).
+# `cargo`/`lotacao`/`status` do AfastamentoCache (task 12.1) continuam NÃO
+# vindo daqui — ficam nil, igual antes da migração. Não inventamos de onde
+# tirar esses campos; se forem necessários, precisam de investigação futura
+# (talvez outra tabela, ou junção com FrequentadorCache).
 class SincronizarAfastamentosJob < ApplicationJob
   queue_as :default
 
@@ -41,20 +43,22 @@ class SincronizarAfastamentosJob < ApplicationJob
   def sincronizar_usuario(user)
     return if user.cpf.blank?
 
-    afastamentos = SticapiClient::Intranet.afastamentos(cpf: user.cpf)
-    Array(afastamentos).each { |dados| atualizar_cache(user.cpf, dados) }
+    pessoa = Pessoas::Pessoa.find_by(cpf: user.cpf)
+    return if pessoa.blank?
+
+    pessoa.afastamentos.each { |afastamento| atualizar_cache(user.cpf, afastamento) }
   rescue StandardError => e
     Rails.logger.error("[SincronizarAfastamentosJob] Falha ao sincronizar CPF #{user.cpf}: #{e.message}")
   end
 
-  def atualizar_cache(cpf, dados)
-    return if dados["id"].blank?
+  def atualizar_cache(cpf, afastamento)
+    return if afastamento.id_intranet.blank?
 
-    AfastamentoCache.find_or_initialize_by(afastamento_id_pessoas: dados["id"]).update!(
+    AfastamentoCache.find_or_initialize_by(afastamento_id_pessoas: afastamento.id_intranet).update!(
       cpf: cpf,
-      tipo: dados["afastamento"],
-      momento_inicial: dados["inicio"],
-      momento_final: dados["fim"]
+      tipo: afastamento.tipo_afastamento&.nome,
+      momento_inicial: afastamento.inicio,
+      momento_final: afastamento.fim
     )
   end
 end

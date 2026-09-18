@@ -1,17 +1,26 @@
 module Admin
   class VersoesController < Admin::ApplicationController
-    before_action :set_versao, only: [ :edit, :update, :destroy ]
-    before_action -> { require_admin(versoes_path) }, only: [ :new, :create, :edit, :update, :destroy ]
+    before_action :set_versao, only: [:edit, :update, :destroy]
 
     def index
+      # Task 23.7 — CanCanCan: autorização explícita para listagem.
+      # Admin/gestor/operador podem visualizar (todos têm :read em :all).
+      authorize! :read, :all
+
       @versoes = Versao.order(created_at: :desc)
     end
 
     def new
+      # Task 23.7 — CanCanCan: somente admin pode criar versões.
+      authorize! :manage, Versao
+
       @versao = Versao.new
     end
 
     def create
+      # Task 23.7 — CanCanCan: somente admin pode criar versões.
+      authorize! :manage, Versao
+
       @versao = Versao.new(versao_params)
       if @versao.save
         redirect_to versoes_path, notice: "Versão criada com sucesso"
@@ -21,9 +30,14 @@ module Admin
     end
 
     def edit
+      # Task 23.7 — CanCanCan: somente admin pode editar versões.
+      authorize! :manage, Versao
     end
 
     def update
+      # Task 23.7 — CanCanCan: somente admin pode atualizar versões.
+      authorize! :manage, Versao
+
       if @versao.update(versao_params)
         redirect_to versoes_path, notice: "Versão atualizada com sucesso"
       else
@@ -32,6 +46,9 @@ module Admin
     end
 
     def destroy
+      # Task 23.7 — CanCanCan: somente admin pode excluir versões.
+      authorize! :manage, Versao
+
       @versao.destroy
       redirect_to versoes_path, notice: "Versão excluída com sucesso"
     end
