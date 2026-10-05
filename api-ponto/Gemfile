@@ -3,7 +3,7 @@ source "https://rubygems.org"
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "~> 8.1.0"
 # Use postgresql as the database for Active Record
-gem "pg", "~> 1.1"
+gem "pg", "~> 1.7"
 
 # Conexão (somente leitura) com o MySQL legado da Intranet TJPI — usada apenas
 # pelos jobs de sincronização (Intranet::SyncDigitaisService). Mesma versão e
