@@ -7,6 +7,10 @@ class ImportarServidoresUnidadeJobTest < ActiveJob::TestCase
   # com `.servidores`), `Pessoas::GestorhContrachequeMirror
   # .pares_matricula_cpf_para` (via ResolverCpfPorMatriculaService) e
   # `Pessoas::Pessoa.find_by`.
+  # `find_by` é HERDADO do ActiveRecord — define/remove aqui é seguro (o
+  # `remove_method` desfaz o stub e a busca volta ao ancestral). Não usar o
+  # helper de capturar/restaurar para métodos herdados (não há UnboundMethod
+  # próprio).
   def stub_unidade(resposta)
     Pessoas::Unidade.define_singleton_method(:find_by) { |*_args| resposta }
     yield
@@ -14,11 +18,14 @@ class ImportarServidoresUnidadeJobTest < ActiveJob::TestCase
     Pessoas::Unidade.singleton_class.remove_method(:find_by)
   end
 
+  # `pares_matricula_cpf_para` é `def self.` real de produção: captura/restaura o
+  # UnboundMethod (remove_method o apagaria para os arquivos seguintes do
+  # processo — ver docs/governance/lessons.md).
   def stub_pares_matricula_cpf(pares)
-    Pessoas::GestorhContrachequeMirror.define_singleton_method(:pares_matricula_cpf_para) { |*_args, **_kwargs| pares }
-    yield
-  ensure
-    Pessoas::GestorhContrachequeMirror.singleton_class.remove_method(:pares_matricula_cpf_para)
+    com_metodo_de_classe_stubado(
+      Pessoas::GestorhContrachequeMirror, :pares_matricula_cpf_para,
+      ->(*_args, **_kwargs) { pares }
+    ) { yield }
   end
 
   def stub_pessoas_find_by_cpf(mapa_cpf_para_pessoa)

@@ -29,8 +29,59 @@ module Pessoas
       lotacoes.principais.merge(Pessoas::Lotacao.vigentes).order(inicio: :desc).first
     end
 
+    # Tarefa 29.6 (Sprint 29) — lista de frequentadores VISÍVEIS por um usuário
+    # (PRD §3; §9 item 1). Delegação fina para `FrequentadoresVisiveis` (o
+    # object que monta o SQL e replica a cascata da 29.4): o nome
+    # `frequentadores_visiveis(usuario)` é o contrato citado na 29.7
+    # (`accessible_by`/index). Aditivo — não altera a `Ability` (29.7) nem o
+    # PORO da 29.4.
+    #
+    # NÃO é um `scope :` clássico de propósito: além de ler `vinculos`, precisa
+    # consultar o banco `users` (outro Postgres, sem JOIN cross-database) para
+    # os passos 1/4, então a montagem vive num object dedicado e testável.
+    def self.frequentadores_visiveis(usuario)
+      FrequentadoresVisiveis.para(usuario)
+    end
+
+    # CPFs dos frequentadores VISÍVEIS por um usuário — o ponto de entrada
+    # consumido pela `Ability` e pelos controllers de frequência na 29.7. É a
+    # projeção em CPF de `frequentadores_visiveis` (o chamador precisa de CPF
+    # porque a FK `time_records.user_id` aponta para `users` locais, ligados ao
+    # Pessoas por `users.cpf`).
+    #
+    # Existe como método de classe PRÓPRIO (`def self.`, não um `scope :`) por
+    # dois motivos: (1) o padrão do projeto (Sprint 10B/8.13) de isolar cada
+    # consulta ao banco do Pessoas num único ponto testável/stubável — o banco
+    # `pessoas_test` existe mas não tem schema carregado; e (2) a 29.7 delega a
+    # regra em vez de reimplementá-la: o conjunto de CPFs visíveis vem do
+    # `FrequentadoresVisiveis` (29.6), cuja equivalência com o PORO
+    # `AutorizacaoFrequencia#pode_ver?` é provada item a item pela 29.6.
+    def self.cpfs_frequentadores_visiveis(usuario)
+      frequentadores_visiveis(usuario)
+        .joins(:pessoa)
+        .where.not(pessoas: { cpf: nil })
+        .distinct
+        .pluck("pessoas.cpf")
+    end
+
     def tipo_vinculo
       configuracao_cadastro&.tipo_vinculo
+    end
+
+    # Fonte de "TERCEIRIZADO" do alvo — Decisão D4 do CTO (2026-09-29). É o
+    # TIPO de vínculo (`tipos_vinculo.nome == "Terceirizado"`), idêntico ao
+    # `TipoVinculo#terceirizado?` do pessoas2 (`app/models/tipo_vinculo.rb:234`) —
+    # NÃO a categoria eSocial (`categorias_trabalhador.codigo_esocial`), que não
+    # tem mapeamento determinístico.
+    #
+    # Semântica fixada na 29.4: QUALQUER vínculo ATIVO com tipo Terceirizado
+    # torna a pessoa terceirizada (não só o "vínculo principal"). O espelho não
+    # materializa `vinculo_principal`; usar `.first` sobre os ativos poderia
+    # negar um terceirizado cujo vínculo Terceirizado não fosse o primeiro —
+    # falso negativo (não vaza dado). Por isso o predicado é "algum vínculo
+    # ativo" (consumido em `Pessoas::Pessoa#terceirizado?`).
+    def terceirizado?
+      tipo_vinculo&.nome == "Terceirizado"
     end
 
     # Ponto de entrada único para a tela `admin/frequentadores` (SPRINT-PLAN

@@ -32,5 +32,15 @@ module Pessoas
     def vinculos_ativos
       vinculos.ativos
     end
+
+    # Predicado de TERCEIRIZADO do alvo (Decisão D4 do CTO, 2026-09-29). Regra:
+    # a pessoa é terceirizada se ALGUM vínculo ATIVO tem tipo de vínculo
+    # "Terceirizado" (`Pessoas::Vinculo#terceirizado?`). Não é o "vínculo
+    # principal" — o espelho não o materializa, e o espelho do Pessoas2 casa o
+    # conceito com "vínculo ativo" (Sprint 10B, `.first`). A escolha por "algum"
+    # evita o falso-negativo do alvo com múltiplos vínculos ativos.
+    def terceirizado?
+      vinculos_ativos.any?(&:terceirizado?)
+    end
   end
 end

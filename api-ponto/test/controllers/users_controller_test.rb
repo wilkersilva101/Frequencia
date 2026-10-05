@@ -12,26 +12,23 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
   # schema carregado (task 8.13) — stuba o ponto de entrada, mesmo padrão
   # já usado em frequentadores_controller_test.rb.
   test "deve listar usuarios" do
-    Pessoas::Vinculo.define_singleton_method(:frequentadores_ativos) { |**_kwargs| Kaminari.paginate_array([]).page(1) }
+    com_metodo_de_classe_stubado(Pessoas::Vinculo, :frequentadores_ativos, ->(**_kwargs) { Kaminari.paginate_array([]).page(1) }) do
+      get users_path
 
-    get users_path
-
-    assert_response :success
-  ensure
-    Pessoas::Vinculo.singleton_class.remove_method(:frequentadores_ativos)
+      assert_response :success
+    end
   end
 
   test "usuario local sem cpf aparece na secao separada, mesmo sem vinculo no pessoas2" do
-    Pessoas::Vinculo.define_singleton_method(:frequentadores_ativos) { |**_kwargs| Kaminari.paginate_array([]).page(1) }
     sem_cpf = User.create!(nome_completo: "Admin Sem Vinculo", password: "123456")
 
-    get users_path
+    com_metodo_de_classe_stubado(Pessoas::Vinculo, :frequentadores_ativos, ->(**_kwargs) { Kaminari.paginate_array([]).page(1) }) do
+      get users_path
 
-    assert_response :success
-    assert_select "td", text: "Admin Sem Vinculo"
-    assert_select "code", text: sem_cpf.username
-  ensure
-    Pessoas::Vinculo.singleton_class.remove_method(:frequentadores_ativos)
+      assert_response :success
+      assert_select "td", text: "Admin Sem Vinculo"
+      assert_select "code", text: sem_cpf.username
+    end
   end
 
   test "deve mostrar formulario de edicao" do

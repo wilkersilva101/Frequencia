@@ -1,6 +1,21 @@
 require "test_helper"
 
 class DashboardControllerTest < ActionDispatch::IntegrationTest
+  # O scope de negócio `Pessoas::Vinculo.ativos` REAL, capturado no LOAD deste
+  # arquivo (antes de qualquer teste rodar). O stub destrutivo anterior usava
+  # `remove_method(:ativos)`; no Rails, scopes SÃO definidos como
+  # `singleton_class.define_method(name)` (activerecord `scoping/named.rb`),
+  # então aquilo removia o PRÓPRIO scope de negócio — não um stub — e não o
+  # restaurava. Resultado: varíola order-dependent (`NoMethodError: undefined
+  # method 'ativos'`) que contaminava qualquer arquivo rodado DEPOIS deste.
+  #
+  # Fix: em vez de remover, capturamos o UnboundMethod real aqui (no load) e o
+  # reinstalamos no teardown — sempre, inclusive quando o teste falha (o
+  # teardown do Minitest roda mesmo sob falha/exceção). Mesmo padrão da
+  # blindagem da task 29.4 (`autorizacao_frequencia_test.rb`).
+  SCOPE_ATIVOS_REAL =
+    Pessoas::Vinculo.singleton_class.instance_method(:ativos) if Pessoas::Vinculo.respond_to?(:ativos)
+
   setup do
     @user = User.create!(nome_completo: "Admin Teste", password: "123456", admin: true)
     post login_path, params: { username: @user.username, password: "123456" }
@@ -14,12 +29,21 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
   end
 
   teardown do
-    Pessoas::Vinculo.singleton_class.remove_method(:ativos) if Pessoas::Vinculo.singleton_class.method_defined?(:ativos)
+    restaurar_scope_ativos!
   end
 
+  # Redefine `ativos` com um retorno fixo (lista capturada por closure). NÃO
+  # remove o método: o scope original fica preservado em SCOPE_ATIVOS_REAL.
   def stub_vinculos_ativos(lista)
-    Pessoas::Vinculo.singleton_class.remove_method(:ativos) if Pessoas::Vinculo.singleton_class.method_defined?(:ativos)
     Pessoas::Vinculo.define_singleton_method(:ativos) { lista }
+  end
+
+  # Reinstala o scope real capturado no load. Idempotente e seguro quando o
+  # método já é o real.
+  def restaurar_scope_ativos!
+    return unless SCOPE_ATIVOS_REAL
+
+    Pessoas::Vinculo.singleton_class.send(:define_method, :ativos, SCOPE_ATIVOS_REAL)
   end
 
   test "deve carregar dashboard" do

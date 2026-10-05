@@ -16,13 +16,12 @@ module Admin
     end
 
     # Mesmo padrão de stub de test/controllers/admin/frequentadores_controller_test.rb
-    # (banco `pessoas_test` sem schema carregado — task 8.13).
+    # (banco `pessoas_test` sem schema carregado — task 8.13). Usa o helper
+    # capturar/restaurar: `remove_method` num método real de produção (aqui um
+    # `def self.`) o apagaria para os arquivos seguintes do mesmo processo.
     def stub_vinculos(vinculos)
       paginado = Kaminari.paginate_array(vinculos).page(1)
-      Pessoas::Vinculo.define_singleton_method(:frequentadores_ativos) { |**_kwargs| paginado }
-      yield
-    ensure
-      Pessoas::Vinculo.singleton_class.remove_method(:frequentadores_ativos)
+      com_metodo_de_classe_stubado(Pessoas::Vinculo, :frequentadores_ativos, ->(**_kwargs) { paginado }) { yield }
     end
 
     test "deve listar usuarios sem cpf (cadastrados manualmente)" do

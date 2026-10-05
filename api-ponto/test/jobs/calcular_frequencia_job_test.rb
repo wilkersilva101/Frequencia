@@ -2,15 +2,12 @@ require "test_helper"
 
 class CalcularFrequenciaJobTest < ActiveJob::TestCase
   # `CalculoDiarioService.calcular` é um método real (`def self.calcular`),
-  # então `remove_method` depois de um `define_singleton_method` o apagaria
-  # de vez em vez de restaurar a definição original. Salvamos o método
-  # original e o restauramos via `define_singleton_method` no `ensure`.
+  # então `remove_method` depois de um `define_singleton_method` o apagaria de
+  # vez. Captura/restaura o UnboundMethod real (helper compartilhado) — a versão
+  # anterior reinstalava um WRAPPER que chamava o original, deixando um override
+  # permanente no singleton; agora o próprio método de produção volta.
   def com_calcular_stub(stub)
-    original = CalculoDiarioService.method(:calcular)
-    CalculoDiarioService.define_singleton_method(:calcular, &stub)
-    yield
-  ensure
-    CalculoDiarioService.define_singleton_method(:calcular) { |*args| original.call(*args) }
+    com_metodo_de_classe_stubado(CalculoDiarioService, :calcular, stub) { yield }
   end
   def criar_regime(limite_credito: 10, limite_debito: 10)
     Regime.create!(

@@ -5,6 +5,10 @@ require "test_helper"
 class PessoasEspelhoHelperTest < ActiveSupport::TestCase
   include PessoasEspelhoHelper
 
+  # Débito B1: em CI/máquina limpos sem o schema do espelho, PULA em vez de
+  # explodir com PG::UndefinedTable (ver `skip_sem_espelho!`).
+  setup { skip_sem_espelho! }
+
   test "runs inside an open transaction on the pessoas connection" do
     criar_pessoa
 

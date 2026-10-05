@@ -4,9 +4,16 @@ require "rails/test_help"
 # Helpers do espelho Pessoas (ADR-0006). Incluídos só nas classes que usam o
 # schema real, para não acoplar a suíte inteira ao banco espelho.
 require_relative "support/pessoas_espelho_helper"
+# Stub de método de classe capturar/restaurar (não destrutivo) — ver o próprio
+# arquivo e a lição em docs/governance/lessons.md. Incluído na base para que
+# QUALQUER teste stube métodos de classe sem vazar para os arquivos seguintes.
+require_relative "support/class_method_stub_helper"
 
 module ActiveSupport
   class TestCase
+    # Stub de método de classe capturar/restaurar (não destrutivo).
+    include ClassMethodStubHelper
+
     # Run tests in parallel with specified workers
     parallelize(workers: :number_of_processors)
 

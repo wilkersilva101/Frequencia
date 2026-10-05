@@ -27,15 +27,15 @@ module Admin
     def stub_vinculos(vinculos, unidades_por_vinculo_id: {}, categorias_trabalhador: [])
       paginado = Kaminari.paginate_array(vinculos).page(1)
 
-      Pessoas::Vinculo.define_singleton_method(:frequentadores_ativos) { |**_kwargs| paginado }
-      Pessoas::Vinculo.define_singleton_method(:unidades_por_vinculo) { |*_args| unidades_por_vinculo_id }
-      Pessoas::CategoriaTrabalhador.define_singleton_method(:em_uso) { categorias_trabalhador }
-
-      yield
-    ensure
-      Pessoas::Vinculo.singleton_class.remove_method(:frequentadores_ativos)
-      Pessoas::Vinculo.singleton_class.remove_method(:unidades_por_vinculo)
-      Pessoas::CategoriaTrabalhador.singleton_class.remove_method(:em_uso)
+      # `frequentadores_ativos`/`unidades_por_vinculo` (def self. de
+      # Pessoas::Vinculo) e `em_uso` (scope Rails de CategoriaTrabalhador) são
+      # métodos reais de produção: `remove_method` os apagaria para os
+      # arquivos seguintes do mesmo processo (ver docs/governance/lessons.md).
+      com_metodos_de_classe_stubados([
+        [ Pessoas::Vinculo, :frequentadores_ativos, ->(**_kwargs) { paginado } ],
+        [ Pessoas::Vinculo, :unidades_por_vinculo, ->(*_args) { unidades_por_vinculo_id } ],
+        [ Pessoas::CategoriaTrabalhador, :em_uso, -> { categorias_trabalhador } ]
+      ]) { yield }
     end
 
     test "deve enfileirar o job de reimportacao quando o frequentador tem cpf" do
@@ -123,19 +123,15 @@ module Admin
       categoria_recebida = nil
       paginado = Kaminari.paginate_array([]).page(1)
 
-      Pessoas::Vinculo.define_singleton_method(:frequentadores_ativos) do |**kwargs|
-        categoria_recebida = kwargs[:categoria_trabalhador_id]
-        paginado
-      end
-      Pessoas::Vinculo.define_singleton_method(:unidades_por_vinculo) { |*_args| {} }
-      Pessoas::CategoriaTrabalhador.define_singleton_method(:em_uso) { [] }
-
-      begin
+      com_metodos_de_classe_stubados([
+        [ Pessoas::Vinculo, :frequentadores_ativos, ->(**kwargs) do
+          categoria_recebida = kwargs[:categoria_trabalhador_id]
+          paginado
+        end ],
+        [ Pessoas::Vinculo, :unidades_por_vinculo, ->(*_args) { {} } ],
+        [ Pessoas::CategoriaTrabalhador, :em_uso, -> { [] } ]
+      ]) do
         get frequentadores_path, params: { categoria: "34" }
-      ensure
-        Pessoas::Vinculo.singleton_class.remove_method(:frequentadores_ativos)
-        Pessoas::Vinculo.singleton_class.remove_method(:unidades_por_vinculo)
-        Pessoas::CategoriaTrabalhador.singleton_class.remove_method(:em_uso)
       end
 
       assert_equal "34", categoria_recebida
@@ -232,19 +228,24 @@ module Admin
         "55566677788" => pessoa_double.new(id: 2, nome: "Servidor Dois", username: nil, vinculos_ativos: [])
       }
 
+      # `find_by` é HERDADO do ActiveRecord (não é método próprio da classe):
+      # aqui o padrão define/remove É seguro — o `remove_method` desfaz o stub e
+      # a busca volta ao ancestral. Já `pares_matricula_cpf_para` é `def self.`
+      # real de produção e precisa de capturar/restaurar (senão vaza).
       Pessoas::Unidade.define_singleton_method(:find_by) { |*_args| unidade }
-      Pessoas::GestorhContrachequeMirror.define_singleton_method(:pares_matricula_cpf_para) do |*_args, **_kwargs|
-        [ [ "1001", "11122233344" ], [ "1002", "55566677788" ] ]
-      end
       Pessoas::Pessoa.define_singleton_method(:find_by) { |cpf:| pessoas_por_cpf[cpf] }
 
       begin
-        perform_enqueued_jobs do
-          post importar_unidade_frequentadores_path
+        com_metodo_de_classe_stubado(
+          Pessoas::GestorhContrachequeMirror, :pares_matricula_cpf_para,
+          ->(*_args, **_kwargs) { [ [ "1001", "11122233344" ], [ "1002", "55566677788" ] ] }
+        ) do
+          perform_enqueued_jobs do
+            post importar_unidade_frequentadores_path
+          end
         end
       ensure
         Pessoas::Unidade.singleton_class.remove_method(:find_by)
-        Pessoas::GestorhContrachequeMirror.singleton_class.remove_method(:pares_matricula_cpf_para)
         Pessoas::Pessoa.singleton_class.remove_method(:find_by)
       end
 

@@ -1,0 +1,199 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# CI do Frequencia no GitHub Actions (remote de DESENVOLVIMENTO: origin/upstream).
+#
+# ⚠️⚠️ ESTE ARQUIVO PRECISA FICAR NA **RAIZ DO REPOSITÓRIO** (`Frequencia/`).
+#     O repositório é um **MONOREPO**: a raiz git contém `api-ponto/` (app Rails),
+#     `docs/`, `PRD-*.md`, `SPRINT-PLAN.md`. O **GitHub Actions só descobre
+#     workflows em `.github/workflows/` na RAIZ** do repo — NÃO há descoberta
+#     automática em subpasta. Por isso este arquivo NÃO pode voltar para
+#     `api-ponto/.github/`: quando vivia lá, o GitHub **nunca o executou** (não
+#     falhava — não existia). É o MESMO defeito de monorepo já corrigido no
+#     `.gitlab-ci.yml` (commit `7db515c`). **NÃO mova de volta.**
+#
+# ⚠️  Os comandos (`bin/brakeman`, `bin/rubocop`, `bin/rails`), o `Gemfile` e os
+#     binstubs vivem em `api-ponto/`, NÃO na raiz. Da RAIZ, `bin/brakeman` falha
+#     com `command not found` (exit 127) — não existe `bin/` na raiz. Por isso:
+#       • `defaults.run.working-directory: api-ponto` — TODOS os steps `run:`
+#         executam dentro de `api-ponto/`. É o equivalente ao `cd api-ponto` do
+#         `before_script` do `.gitlab-ci.yml`. **NÃO remova** achando que é
+#         ruído: sem ele nada é encontrado a partir da raiz.
+#       • `working-directory: api-ponto` no step `ruby/setup-ruby` — obrigatório
+#         e **NÃO** coberto pelo `defaults`: por doc oficial, `defaults.run` só
+#         afeta steps `run:`, **NÃO** steps `uses:`. Sem ele o `bundler-cache`
+#         procura `Gemfile.lock`/`.ruby-version`/`.tool-versions` na RAIZ e não
+#         acha (a app é em `api-ponto/`).
+#     ⚠️  `defaults.run` TAMBÉM não se aplica a `actions/checkout` — que deve
+#         mesmo rodar na raiz (o checkout é do repo inteiro).
+#     ⚠️  O `ruby-version: '3.3.8'` explícito abaixo **sobrepõe** o
+#         `api-ponto/.ruby-version` (que diz `ruby-4.0.0`, inexistente).
+#
+# Origem: fork de paridade com o `.gitlab-ci.yml` (produção). Ver
+# `docs/progress/iteration_chore_github-workflows.md` e `iteration_chore_gitlab-ci.md`.
+# ═════════════════════════════════════════════════════════════════════════════
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+# Step `run:` executam DENTRO de `api-ponto/` (a app Rails); o repo é monorepo.
+# NÃO cobre steps `uses:` (checkout/setup-ruby) — esses têm tratamento próprio.
+defaults:
+  run:
+    working-directory: api-ponto
+
+jobs:
+  scan_ruby:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          # Fixado na versão REAL medida (ruby -v = 3.3.8; Gemfile.lock rails
+          # 8.0.5). `.ruby-version`/`.tool-versions` dizem `ruby-4.0.0`, que NÃO
+          # existe — o job quebrava antes de rodar. Mesmo pin do `.gitlab-ci.yml`
+          # (paridade dev/prod). Ver docs/progress/iteration_chore_gitlab-ci.md.
+          ruby-version: '3.3.8'
+          bundler-cache: true
+          # ⚠️ OBRIGATÓRIO: `defaults.run` NÃO afeta steps `uses:`. Sem isto, o
+          # `bundler-cache` procura `Gemfile.lock`/`.ruby-version` na RAIZ do
+          # monorepo e não os acha — a app Rails vive em `api-ponto/`.
+          working-directory: api-ponto
+
+      - name: Scan for common Rails security vulnerabilities using static analysis
+        run: bin/brakeman --no-pager
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          # Fixado na versão REAL medida (ruby -v = 3.3.8; Gemfile.lock rails
+          # 8.0.5). `.ruby-version`/`.tool-versions` dizem `ruby-4.0.0`, que NÃO
+          # existe — o job quebrava antes de rodar. Mesmo pin do `.gitlab-ci.yml`
+          # (paridade dev/prod). Ver docs/progress/iteration_chore_gitlab-ci.md.
+          ruby-version: '3.3.8'
+          bundler-cache: true
+          # ⚠️ OBRIGATÓRIO: `defaults.run` NÃO afeta steps `uses:`. Sem isto, o
+          # `bundler-cache` procura `Gemfile.lock`/`.ruby-version` na RAIZ do
+          # monorepo e não os acha — a app Rails vive em `api-ponto/`.
+          working-directory: api-ponto
+
+      - name: Lint code for consistent style
+        run: bin/rubocop -f github
+
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=3
+
+      # redis:
+      #   image: redis
+      #   ports:
+      #     - 6379:6379
+      #   options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      # ⚠️ Este passo roda ANTES do checkout, então `api-ponto/` AINDA NÃO EXISTE:
+      # o `defaults.run.working-directory: api-ponto` acima faria o runner falhar
+      # ("working directory does not exist"). Sobrescreve-se para a RAIZ (`.`),
+      # que existe sempre. Este `apt-get` não depende da app — só de rede.
+      - name: Install packages
+        working-directory: .
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y build-essential git libpq-dev libyaml-dev pkg-config
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          # Fixado na versão REAL medida (ruby -v = 3.3.8; Gemfile.lock rails
+          # 8.0.5). `.ruby-version`/`.tool-versions` dizem `ruby-4.0.0`, que NÃO
+          # existe — o job quebrava antes de rodar. Mesmo pin do `.gitlab-ci.yml`
+          # (paridade dev/prod). Ver docs/progress/iteration_chore_gitlab-ci.md.
+          ruby-version: '3.3.8'
+          bundler-cache: true
+          # ⚠️ OBRIGATÓRIO: `defaults.run` NÃO afeta steps `uses:`. Sem isto, o
+          # `bundler-cache` procura `Gemfile.lock`/`.ruby-version` na RAIZ do
+          # monorepo e não os acha — a app Rails vive em `api-ponto/`.
+          working-directory: api-ponto
+
+      # ADR-0006 / débito B1 do review final da 29.2: a suíte tem testes que
+      # leem o espelho `Pessoas::*`, que vive num banco próprio
+      # (`frequencia_pessoas_espelho_test`) com schema copiado do Pessoas2.
+      # `db:test:prepare` NÃO o cria (a conexão tem `database_tasks: false`),
+      # então sem este passo os testes do espelho quebravam no CI. Passos
+      # idênticos aos documentados no README (seção "How to run the test suite").
+      #
+      # SEM `|| true`: o CI tem de FALHAR se o banco não puder ser criado. A
+      # primeira versão tolerava a falha, o que — somado ao
+      # `skip_sem_espelho!` dos testes — deixava a suíte VERDE com 19 skips,
+      # isto é, sem exercitar o espelho nenhuma vez. Seria um gate que passa
+      # sem executar (o mesmo anti-padrão do `bin/brakeman` com
+      # `--ensure-latest`, ver lessons.md). O `skip` é rede de segurança para
+      # a máquina do dev; no CI o setup é obrigatório.
+      - name: Create the Pessoas mirror test database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          until pg_isready -h localhost -p 5432 -U postgres; do sleep 1; done
+          # A role pode já existir (idempotência) — só esse caso é tolerado.
+          #
+          # A role PRECISA de senha: a imagem oficial do Postgres aplica
+          # `host all all all scram-sha-256` (as linhas `trust` de loopback do
+          # initdb são substituídas), e as conexões do runner chegam pelo
+          # bridge como 172.17.0.1 — NÃO caem na regra `trust` do loopback.
+          # Sem senha aqui (`rolpassword = NULL`) e com `PESSOAS_DB_PASSWORD: ""`
+          # o `test:pessoas_schema:load` abortava com
+          # `fe_sendauth: no password supplied`. A senha é local ao runner
+          # efêmero; a mesma é passada em `PESSOAS_DB_PASSWORD` no passo abaixo.
+          psql -h localhost -U postgres -d postgres -c "CREATE ROLE \"app.frequencia\" LOGIN PASSWORD 'app'" 2>/dev/null || true
+          createdb -h localhost -U postgres -O "app.frequencia" frequencia_pessoas_espelho_test 2>/dev/null || true
+          # Prova de que o banco EXISTE antes de seguir: sem esta checagem, uma
+          # falha do `createdb` só apareceria como skips lá na frente.
+          psql -h localhost -U postgres -d postgres -tAc \
+            "SELECT 1 FROM pg_database WHERE datname = 'frequencia_pessoas_espelho_test'" | grep -q 1
+
+      - name: Run tests
+        env:
+          RAILS_ENV: test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432
+          # As credenciais `pessoas_db` (host/user/password do banco espelho)
+          # vêm de Rails encrypted credentials no ambiente real. Em CI limpo
+          # elas podem não existir, e o `database.yml` do bloco `pessoas` fica
+          # sem host/port — por isso as variáveis abaixo sobrepõem o essencial
+          # para o banco do espelho em localhost (o `database.yml` usa
+          # `ENV.fetch(..., credentials)`). Mesmo assim, o
+          # `test/support/pessoas_espelho_helper.rb` (`skip_sem_espelho!`) é a
+          # rede de segurança para quem roda a suíte SEM o setup.
+          PESSOAS_DB_HOST: localhost
+          PESSOAS_DB_PORT: 5432
+          PESSOAS_DB_USERNAME: app.frequencia
+          # Senha da role criada no passo "Create the Pessoas mirror test
+          # database" acima. Sem ela, a auth `scram-sha-256` da imagem oficial
+          # rejeita a conexão vinda do bridge (ver comentário daquele passo).
+          PESSOAS_DB_PASSWORD: app
+          PESSOAS_DB_DATABASE: frequencia_pessoas_espelho_test
+          # REDIS_URL: redis://localhost:6379/0
+        run: |
+          bin/rails db:test:prepare
+          bin/rails test:pessoas_schema:load
+          bin/rails test

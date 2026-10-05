@@ -5,11 +5,14 @@ class ResolverCpfPorMatriculaServiceTest < ActiveSupport::TestCase
   # carregado, ver nota em test/jobs/importar_dados_pessoa_job_test.rb) —
   # stubamos o ponto de entrada único que o serviço usa,
   # `Pessoas::GestorhContrachequeMirror.pares_matricula_cpf_para`.
+  # `pares_matricula_cpf_para` é `def self.` real de produção: captura/restaura o
+  # UnboundMethod (remove_method o apagaria para os arquivos seguintes do
+  # processo — ver docs/governance/lessons.md).
   def stub_pares(resposta)
-    Pessoas::GestorhContrachequeMirror.define_singleton_method(:pares_matricula_cpf_para) { |*_args, **_kwargs| resposta }
-    yield
-  ensure
-    Pessoas::GestorhContrachequeMirror.singleton_class.remove_method(:pares_matricula_cpf_para)
+    com_metodo_de_classe_stubado(
+      Pessoas::GestorhContrachequeMirror, :pares_matricula_cpf_para,
+      ->(*_args, **_kwargs) { resposta }
+    ) { yield }
   end
 
   test "resolve as matriculas encontradas na competencia" do
@@ -74,17 +77,13 @@ class ResolverCpfPorMatriculaServiceTest < ActiveSupport::TestCase
     chamadas = 0
     pares = [ [ "1001", "11122233344" ] ]
 
-    Pessoas::GestorhContrachequeMirror.define_singleton_method(:pares_matricula_cpf_para) do |*_args, **_kwargs|
+    com_metodo_de_classe_stubado(Pessoas::GestorhContrachequeMirror, :pares_matricula_cpf_para, ->(*_args, **_kwargs) do
       chamadas += 1
       pares
-    end
-
-    begin
+    end) do
       service = ResolverCpfPorMatriculaService.new(mes: 7, ano: 2026)
       service.call(%w[1001])
       service.call(%w[1001])
-    ensure
-      Pessoas::GestorhContrachequeMirror.singleton_class.remove_method(:pares_matricula_cpf_para)
     end
 
     assert_equal 1, chamadas
@@ -94,7 +93,7 @@ class ResolverCpfPorMatriculaServiceTest < ActiveSupport::TestCase
 
   test "mais_recente prioriza o mes atual quando a matricula aparece nos dois" do
     travel_to Time.zone.local(2026, 7, 15) do
-      Pessoas::GestorhContrachequeMirror.define_singleton_method(:pares_matricula_cpf_para) do |mes:, ano:|
+      com_metodo_de_classe_stubado(Pessoas::GestorhContrachequeMirror, :pares_matricula_cpf_para, ->(mes:, ano:) do
         if mes == 7 && ano == 2026
           [ [ "1001", "AAA_MES_ATUAL" ] ]
         elsif mes == 6 && ano == 2026
@@ -102,32 +101,24 @@ class ResolverCpfPorMatriculaServiceTest < ActiveSupport::TestCase
         else
           []
         end
-      end
-
-      begin
+      end) do
         resultado = ResolverCpfPorMatriculaService.mais_recente(%w[1001])
         assert_equal({ "1001" => "AAA_MES_ATUAL" }, resultado)
-      ensure
-        Pessoas::GestorhContrachequeMirror.singleton_class.remove_method(:pares_matricula_cpf_para)
       end
     end
   end
 
   test "mais_recente usa o mes anterior quando a matricula so aparece nele" do
     travel_to Time.zone.local(2026, 7, 15) do
-      Pessoas::GestorhContrachequeMirror.define_singleton_method(:pares_matricula_cpf_para) do |mes:, ano:|
+      com_metodo_de_classe_stubado(Pessoas::GestorhContrachequeMirror, :pares_matricula_cpf_para, ->(mes:, ano:) do
         if mes == 6 && ano == 2026
           [ [ "2002", "SO_MES_ANTERIOR" ] ]
         else
           []
         end
-      end
-
-      begin
+      end) do
         resultado = ResolverCpfPorMatriculaService.mais_recente(%w[2002])
         assert_equal({ "2002" => "SO_MES_ANTERIOR" }, resultado)
-      ensure
-        Pessoas::GestorhContrachequeMirror.singleton_class.remove_method(:pares_matricula_cpf_para)
       end
     end
   end
@@ -136,17 +127,13 @@ class ResolverCpfPorMatriculaServiceTest < ActiveSupport::TestCase
     travel_to Time.zone.local(2026, 1, 10) do
       chamadas_mes_ano = []
 
-      Pessoas::GestorhContrachequeMirror.define_singleton_method(:pares_matricula_cpf_para) do |mes:, ano:|
+      com_metodo_de_classe_stubado(Pessoas::GestorhContrachequeMirror, :pares_matricula_cpf_para, ->(mes:, ano:) do
         chamadas_mes_ano << [ mes, ano ]
         []
-      end
-
-      begin
+      end) do
         ResolverCpfPorMatriculaService.mais_recente(%w[1001])
         assert_includes chamadas_mes_ano, [ 12, 2025 ]
         assert_includes chamadas_mes_ano, [ 1, 2026 ]
-      ensure
-        Pessoas::GestorhContrachequeMirror.singleton_class.remove_method(:pares_matricula_cpf_para)
       end
     end
   end

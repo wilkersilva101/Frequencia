@@ -56,6 +56,34 @@ module PessoasEspelhoHelper
     pessoa
   end
 
+  # Débito B1 do review final da 29.2 (2026-09-29) — guarda defensiva para
+  # máquina/CI limpos.
+  #
+  # Os testes do espelho APENAS FUNCIONAM com o schema carregado
+  # (`RAILS_ENV=test bin/rails test:pessoas_schema:load`, ver README). Em CI
+  # limpo — ou numa máquina nova — as tabelas não existem e os testes
+  # explodiam com `PG::UndefinedTable` em vez de falhar de forma
+  # compreensível. Chamar isto no `setup` faz o teste ser PULADO com motivo
+  # explícito, em vez de derrubar a suíte.
+  #
+  # Não substitui o CI correto (que deve preparar o banco — ver o passo no
+  # `.github/workflows/ci.yml`): é a rede de segurança para quem roda a suíte
+  # sem o setup, e mantém o sinal honesto de cobertura (um `skip` aparece no
+  # relatório; um erro de conexão esconde o problema).
+  def skip_sem_espelho!
+    return if espelho_disponivel?
+
+    skip "espelho Pessoas indisponível — rode `RAILS_ENV=test bin/rails test:pessoas_schema:load` (ver README)"
+  end
+
+  # A conexão `pessoas` está configurada e as tabelas do espelho existem?
+  # Rescata falha de conexão (CI sem o banco) como "indisponível", não como erro.
+  def espelho_disponivel?
+    Pessoas::Unidade.connection.table_exists?(:pessoas)
+  rescue ActiveRecord::ActiveRecordError, PG::Error
+    false
+  end
+
   private
 
   def inserir_espelho(model, **atributos)

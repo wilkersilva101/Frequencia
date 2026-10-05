@@ -37,13 +37,17 @@ class TimeRecordsControllerTest < ActionDispatch::IntegrationTest
     # busca por nome contra os Users locais de teste (que já têm cpf
     # preenchido), igual ao padrão de stub já usado em
     # frequentadores_controller_test.rb.
+    # `cpfs_por_nome` é `def self.` real de produção — capturamos o UnboundMethod
+    # no setup e o reinstalamos no teardown (remove_method o apagaria para os
+    # arquivos seguintes do mesmo processo; ver docs/governance/lessons.md).
+    @cpfs_por_nome_original = Pessoas::Vinculo.singleton_class.instance_method(:cpfs_por_nome)
     Pessoas::Vinculo.define_singleton_method(:cpfs_por_nome) do |nome|
       User.where("nome_completo ILIKE ?", "%#{nome}%").where.not(cpf: nil).pluck(:cpf)
     end
   end
 
   teardown do
-    Pessoas::Vinculo.singleton_class.remove_method(:cpfs_por_nome)
+    Pessoas::Vinculo.singleton_class.send(:define_method, :cpfs_por_nome, @cpfs_por_nome_original)
     Pessoas::User.define_singleton_method(:buscar_por_cpf, @buscar_por_cpf_original)
   end
 

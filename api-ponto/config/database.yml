@@ -69,11 +69,25 @@ test:
   # com a estrutura de `unidades`/`pessoas` copiada do pessoas2/db/schema.rb.
   pessoas:
     <<: *default
-    database: frequencia_pessoas_espelho_test
-    username: <%= Rails.application.credentials.dig(:pessoas_db, :username) %>
-    password: <%= Rails.application.credentials.dig(:pessoas_db, :password) %>
-    host: <%= Rails.application.credentials.dig(:pessoas_db, :host) %>
-    port: <%= Rails.application.credentials.dig(:pessoas_db, :port) %>
+    # RR-S2 do re-review de pipeline (2026-09-29): o nome do banco lia literal
+    # (`frequencia_pessoas_espelho_test`), então `PESSOAS_DB_DATABASE` no CI
+    # era DECORATIVO — apontar a variável para outro banco NÃO redirecionava a
+    # conexão (diferente do bloco `development`, que lê credentials). Agora a
+    # ENV tem precedência (default = o banco de sempre), destravando o
+    # isolamento de banco por trilha (ex.: banco próprio por fase/shard) que a
+    # Fase 2 vai precisar. Preserva o fix do B1: ENV > credentials nos 4 campos.
+    database: <%= ENV.fetch("PESSOAS_DB_DATABASE", "frequencia_pessoas_espelho_test") %>
+    # Débito B1 do review final da 29.2: as variáveis `PESSOAS_DB_*` têm
+    # PRECEDÊNCIA sobre as credentials. Em CI/máquina limpa o `master.key` não
+    # está presente (o blob é versionado, a chave não), então
+    # `credentials.dig(:pessoas_db, :username)` seria `nil` e o Postgres
+    # receberia usuário vazio — falha de conexão antes de qualquer teste. No
+    # ambiente do dev as credentials continuam sendo a fonte (as ENV não
+    # existem lá). Mesmo padrão do bloco `intranet_*` mais abaixo.
+    username: <%= ENV.fetch("PESSOAS_DB_USERNAME", Rails.application.credentials.dig(:pessoas_db, :username)) %>
+    password: <%= ENV.fetch("PESSOAS_DB_PASSWORD", Rails.application.credentials.dig(:pessoas_db, :password)) %>
+    host: <%= ENV.fetch("PESSOAS_DB_HOST", Rails.application.credentials.dig(:pessoas_db, :host)) %>
+    port: <%= ENV.fetch("PESSOAS_DB_PORT", Rails.application.credentials.dig(:pessoas_db, :port)) %>
     database_tasks: false
 
 # ── Conexão (somente leitura) com o MySQL legado da Intranet TJPI ────────

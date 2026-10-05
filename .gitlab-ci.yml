@@ -1,0 +1,240 @@
+# CI do Frequencia no GitLab (remote de PRODUÇÃO: gitlab.tjpi.jus.br).
+#
+# ⚠️⚠️ ESTE ARQUIVO PRECISA FICAR NA **RAIZ DO REPOSITÓRIO** (`Frequencia/`).
+#     O repositório é um **MONOREPO**: a raiz git contém `api-ponto/`, `docs/`,
+#     `PRD-*.md`, `SPRINT_*.md`, `opencode.json` — e o app Rails vive em
+#     `api-ponto/`. O **GitLab só lê o `.gitlab-ci.yml` da raiz** do repo; NÃO
+#     há descoberta automática em subpasta. Por isso este arquivo NÃO pode
+#     voltar para `api-ponto/` (foi criado lá por engano: todos os comandos
+#     teriam o pipeline "não criado", e não apenas "falho").
+# ⚠️⚠️ Por isso o `before_script` global abaixo faz `cd api-ponto`: TODOS os
+#     comandos deste arquivo (`bundle install`, `bin/brakeman`, `bin/rubocop`,
+#     `bin/rails`) são relativos à app Rails em `api-ponto/`, e o `before_script`
+#     roda no MESMO shell do `script` — o `cd` persiste e o resto do arquivo
+#     continua válido sem alteração. **NÃO remova o `cd`** achando que é ruído:
+#     sem ele nada é encontrado a partir da raiz.
+#
+# Fork do `.github/workflows/ci.yml` (GitHub Actions) para o runner GitLab —
+# decisão do CTO (2026-09-29, §Triagem Fase 2 §2). Motivo: o remote de produção
+# é o GitLab e o `ci.yml` de GitHub (`runs-on: ubuntu-latest` +
+# `ruby-version: .ruby-version` → `ruby-4.0.0` INEXISTENTE) **não roda em
+# produção**; sem este arquivo, o passo do banco do espelho e o gate do
+# Brakeman não existem no ambiente real (a 29.0 não fechava a "definição de
+# pronto" em produção).
+#
+# Modelo: `pessoas2/.gitlab-ci.yml` (imagem do registry institucional). ATENÇÃO:
+# o `pessoas2` é um app Rails ÚNICO na raiz (não é monorepo) — o modelo NÃO
+# cobre o `cd api-ponto`; os passos foram portados do `ci.yml` já provado.
+
+# ── Imagem ───────────────────────────────────────────────────────────────────
+# DÍVIDA DE VERSÃO RESOLVIDA (chore `chore/bump-rails-8.1`, 2026-10-05; ADR-0009):
+# as três fontes passaram a concordar com o ambiente medido.
+#   - `.ruby-version`/`.tool-versions` → **3.3.8** (corrigido de `ruby-4.0.0`, que não existe)
+#   - `AGENTS.md` (raiz) → Rails 8.1.4 / Ruby 3.3.8
+#   - MEDIDO: `ruby -v` = **3.3.8**; `Gemfile.lock` rails = **8.1.4**
+# A versão real continua fixada AQUI (na tag da imagem), não no `.ruby-version`/
+# `.tool-versions` — mudar esses arquivos altera o toolchain local (mise/asdf)
+# de todo mundo (blast radius grande). Trocar a imagem é mudança de 1 linha,
+# reversível e local ao CI. As fontes agora CONSISTEM com `ruby:3.3.8-slim`.
+#
+# A imagem do registry institucional para Ruby 3.3.8 ainda não existe (o
+# registry `.tjpi.jus.br` não resolve fora da rede da instituição). Enquanto
+# isso, usa-se a imagem oficial `ruby:3.3.8-slim` — equivalente funcional ao
+# ambiente medido. Quando o registry publicar `.../frequencia/ruby:3.3.8`,
+# trocar esta linha.
+image: ruby:3.3.8-slim
+
+stages:
+  - security
+  - quality
+  - test
+
+variables:
+  LC_ALL: C.UTF-8
+  LANG: en_US.UTF-8
+  LANGUAGE: en_US.UTF-8
+  TZ: America/Fortaleza
+  RAILS_ENV: "test"
+  BUNDLE_PATH: "vendor/bundle"
+  BUNDLE_JOBS: "4"
+  # ── Banco do espelho (bloco `pessoas` de TEST do database.yml) ─────────────
+  # Host/porta/banco/user são valores NÃO-secretos e sobrescrevíveis: uma
+  # variável de projeto no GitLab (Settings > CI/CD > Variables) TEM
+  # precedência sobre o bloco `variables:` do YAML — então o dono do CI pode
+  # apontar para outra trilha/banco sem editar este arquivo (RR-S2 destravou
+  # isso: o `database.yml` passou a ler `PESSOAS_DB_DATABASE`).
+  #
+  # ⚠️ HOST = `postgres` (o ALIAS do service), NÃO `localhost`. No executor
+  # docker do GitLab os services são alcançados por hostname/alias na rede do
+  # runner; NÃO há forwarding de porta para `localhost` (ao contrário do
+  # `ports:` do GitHub Actions). `localhost` aqui = B1 (job pendurado/falho).
+  # O alias `postgres` só existe no job `test` (o único com o service) — os
+  # outros jobs não usam estas variáveis.
+  #
+  # A SENHA da role NÃO deveria ficar versionada: o ideal é defini-la como
+  # variável de projeto `PESSOAS_DB_PASSWORD`. O default abaixo é o runner
+  # EFÊMERO (o mesmo valor nos dois lados: a criação da role no job `test` e a
+  # conexão) — sem ele, um runner sem a variável de projeto cai no default do
+  # database.yml (credentials), que em CI limpo (sem `master.key`) é `nil`.
+  # A variável de projeto, se existir, sobrepõe este default.
+  PESSOAS_DB_HOST: "postgres"
+  PESSOAS_DB_PORT: "5432"
+  PESSOAS_DB_DATABASE: "frequencia_pessoas_espelho_test"
+  PESSOAS_DB_USERNAME: "app.frequencia"
+  PESSOAS_DB_PASSWORD: "app"
+
+# Passos comuns a TODOS os jobs: pacotes de build do SO + gems. `libpq-dev` e
+# `postgresql-client` são obrigatórios (gem `pg` e os comandos `psql`/`createdb`/
+# `pg_isready` usados no job `test`). `default-libmysqlclient-dev` é exigido pela
+# gem `mysql2` (`Gemfile:12`) — sem ela o `bundle install` ABORTA em
+# `An error occurred while installing mysql2 (0.5.7)` (medido em container
+# `ruby:3.3.8-slim` limpo). O `ci.yml` de GitHub não a lista porque aquele job
+# nunca executou (morria no `ruby-4.0.0`). Sem estoque de cache (runner efêmero
+# sem cache configurado): `bundle install` a cada job — custo aceito em troca de
+# simplicidade e determinismo (pode virar `cache:` depois, se incomodar).
+default:
+  before_script:
+    - apt-get update -qq
+    - >-
+      apt-get install --no-install-recommends -y
+      build-essential git libpq-dev libyaml-dev pkg-config postgresql-client
+      default-libmysqlclient-dev
+    - ruby -v
+    - gem install bundler --no-document
+    # Entra na app Rails. O `before_script` e o `script` rodam no MESMO shell,
+    # então este `cd` persiste para todos os comandos seguintes (que são
+    # relativos a `api-ponto/`: `bundle install`, `bin/brakeman`, `bin/rubocop`,
+    # `bin/rails`). Ver o aviso do topo do arquivo: NÃO remover.
+    - cd api-ponto
+    - bundle install --jobs "$BUNDLE_JOBS"
+
+# ── security: scan real do Brakeman (M2 / ruling do CTO) ────────────────────
+# Comando IDÊNTICO ao do `ci.yml` (paridade dev/prod determinística — ruling
+# M2 §6.4). O `bin/brakeman` carrega as flags anti-drift (exit 8 = nota
+# ausente/vazia; exit 9 = entrada obsoleta) e dá SINAL a elas mesmo com o
+# `Medium` EOLRails vivo (RR-S1: sem isso os exits 8/9 ficavam mascarados pelo
+# exit 3 do `exit_on_warn`).
+#
+# ESTADO ATUAL: `bin/brakeman --no-pager` retorna **EXIT=3** enquanto o Rails
+# for < 8.1.x (o `Medium` `Unmaintained Dependency`/EOLRails, `Gemfile.lock:245`,
+# "Rails 8.0.5 EOL 2026-10-07"). Isso é DÉBITO CONHECIDO e rastreado — NÃO é
+# motivo para silenciar o step (`|| true`) nem para remover o EOLRails do scan.
+# O exit 3 é a PROVA de que o scan roda (antes o `--ensure-latest` fazia exit 0
+# SEM escanear). O step falha de propósito até o bump, exatamente como
+# prescreve o ruling M2 (ordem: bump Rails → ledger+flags → paridade de CI).
+#
+# `allow_failure: true` — DÉBITO PRÉ-EXISTENTE, NÃO silêncio. Sem isto, um job
+# que falha INTERROMPE os stages seguintes (fail-fast por default do GitLab:
+# "if any job fails, jobs in later stages do not start") e o stage `test` —
+# que é o OBJETIVO desta chore (criar o banco espelho e rodar a suíte em
+# produção) — NUNCA EXECUTARIA. Com `allow_failure`, o job RODA (saída e
+# relatório ficam visíveis no log, marcação laranja) e a esteira segue.
+# ⚠️ Isto é uma válvula TEMPORÁRIA e auditável: só é legítima com
+# DONO + PRAZO + GATILHO DE REMOÇÃO (ver `docs/progress/iteration_chore_gitlab-ci.md`).
+#   Dono: dev da stack/Rails.  Prazo: até o EOL do Rails, **2026-10-07**.
+#   Remoção: quando `bin/brakeman --no-pager` = EXIT=0 (bump Rails ≥ 8.1.x) →
+#   trocar `allow_failure: true` por nada (gate volta a ser DURO).
+security:
+  stage: security
+  allow_failure: true
+  script:
+    - bin/brakeman --no-pager
+
+# ── quality: RuboCop com o formatter do GitHub (mesmo do `ci.yml`) ──────────
+# MESMO comando do `ci.yml` (paridade dev/prod). 77 offenses PRÉ-EXISTENTES em
+# 17 arquivos (medido: `bin/rubocop -f github` → EXIT=1); nenhuma nos arquivos
+# desta chore (`bin/brakeman` = 0 offenses). O lint do GitHub nunca havia
+# executado (o job morria no `ruby-4.0.0` inexistente), então este débito
+# estava invisível — o fork o torna visível.
+#
+# `allow_failure: true` — mesma razão do `security`: sem isto o stage `test`
+# não rodaria. O job RODA e reporta; não bloqueia a esteira enquanto o débito
+# existir. Válvula TEMPORÁRIA com DONO + PRAZO + GATILHO (ver o traceability):
+#   Dono: a ratificar pelo coordenador (chore de limpeza de lint).
+#   Prazo: **2026-10-13**.
+#   Remoção: quando `bin/rubocop -f github` = EXIT=0 → remover `allow_failure`.
+quality:
+  stage: quality
+  allow_failure: true
+  script:
+    - bin/rubocop -f github
+
+# ── test: suíte + banco do espelho Pessoas ──────────────────────────────────
+# Espelha a sequência JÁ PROVADA do `ci.yml` (débito B1 fechado e revalidado em
+# container `postgres:17`): `db:test:prepare` → criação do banco do espelho →
+# `test:pessoas_schema:load` → `test`.
+#
+# Sem `redis` (ao contrário do modelo `pessoas2`): a app não usa Redis na
+# suíte (o `ci.yml` também não o declara).
+test:
+  stage: test
+  services:
+    - name: postgres:17
+      alias: postgres
+  variables:
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+    # O service é alcançado pelo ALIAS (`postgres`) na rede do runner. NÃO há
+    # `localhost` (ao contrário do GitHub Actions, que publica `ports: 5432:5432`).
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: "5432"
+    # ── DATABASE_URL ─────────────────────────────────────────────────────────
+    # O `test.primary` do `database.yml` (`api_ponto_test`) NÃO declara host nem
+    # usuário (`<<: *default` + `database:`); sem esta URL ele nunca é criado (o
+    # `createdb` do script só cria o espelho) e o `db:test:prepare` falha.
+    # Portado do `ci.yml:123`, trocando `localhost` pelo alias do service.
+    DATABASE_URL: postgres://postgres:postgres@postgres:5432
+    # ── PGPASSWORD ───────────────────────────────────────────────────────────
+    # A imagem oficial `postgres:17` aplica `host all all all scram-sha-256`.
+    # Sem `PGPASSWORD` os comandos `psql`/`createdb` do script travam no prompt
+    # `Password:` (job pendurado até o timeout) ou negam com `fe_sendauth: no
+    # password supplied`. Vale para TODOS eles, inclusive o `CREATE ROLE`.
+    # Portado do `ci.yml:100` (mesmo valor `postgres`).
+    PGPASSWORD: postgres
+  script:
+    # Espera o Postgres do serviço ficar pronto — pelo ALIAS, não `localhost`.
+    - until pg_isready -h postgres -p 5432 -U postgres; do sleep 1; done
+
+    # ── Criação do banco do espelho (débito B1) ──────────────────────────────
+    # A role PRECISA de senha: a imagem oficial do Postgres aplica
+    # `host all all all scram-sha-256` (as linhas `trust` de loopback do initdb
+    # não cobrem a conexão do runner, que chega pelo bridge como 172.17.0.1).
+    # Sem senha aqui (`rolpassword = NULL`) e com senha vazia no client, o
+    # `test:pessoas_schema:load` abortava com `fe_sendauth: no password
+    # supplied`. A senha é local ao runner efêmero; o client a recebe por
+    # `PGPASSWORD` (variável acima).
+    #
+    # `createdb` SEM `|| true`: a falha de criação tem de QUEBRAR o step — é o
+    # gate que impede o CI de ficar verde sem preparar o banco (anti-padrão que
+    # a sprint combateu). No `ci.yml` de GitHub havia `|| true` por idempotência;
+    # aqui ele esconderia falha real (o service nasce limpo), então foi removido.
+    #
+    # ⚠️ O `|| true` do `CREATE ROLE` abaixo NÃO cobre falha de autenticação/
+    # conexão — ele usa o MESMO caminho de auth (`psql` contra o alias com
+    # `PGPASSWORD`) e falharia pelo mesmo motivo. Ele só absorve o erro
+    # idempotente "role already exists". A cobertura real contra um problema de
+    # conexão/auth é: (a) o `PGPASSWORD` acima, (b) o `until pg_isready` acima,
+    # e (c) o `createdb -O` logo abaixo, que falha em cascata e quebra o step.
+    - >-
+      psql -h postgres -U postgres -d postgres
+      -c "CREATE ROLE \"${PESSOAS_DB_USERNAME}\" LOGIN PASSWORD '${PESSOAS_DB_PASSWORD}'"
+      2>/dev/null || true
+    - >-
+      createdb -h postgres -U postgres -O "${PESSOAS_DB_USERNAME}"
+      "${PESSOAS_DB_DATABASE}"
+    # Prova de que o banco EXISTE antes de seguir: sem esta checagem, uma falha
+    # do `createdb` só apareceria como skips lá na frente (gate que passa sem
+    # executar — o anti-padrão que a sprint quis matar).
+    - >-
+      psql -h postgres -U postgres -d postgres -tAc
+      "SELECT 1 FROM pg_database WHERE datname = '${PESSOAS_DB_DATABASE}'"
+      | grep -q 1
+
+    # ── Suíte ────────────────────────────────────────────────────────────────
+    # `db:test:prepare` NÃO cria o banco do espelho (a conexão tem
+    # `database_tasks: false`), por isso o passo acima. `PESSOAS_DB_*` vêm das
+    # `variables:` (sobrescrevíveis por variável de projeto) e o `database.yml`
+    # do bloco `pessoas` de test as lê com precedência sobre as credentials.
+    - bin/rails db:test:prepare
+    - bin/rails test:pessoas_schema:load
+    - bin/rails test

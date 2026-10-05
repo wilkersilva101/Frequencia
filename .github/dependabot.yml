@@ -1,0 +1,22 @@
+# ⚠️⚠️ ESTE ARQUIVO PRECISA FICAR NA **RAIZ DO REPOSITÓRIO** (`Frequencia/`).
+#     O GitHub só lê `.github/dependabot.yml` da RAIZ do repo — não há
+#     descoberta em subpasta. Em `api-ponto/.github/` ele era ignorado em
+#     silêncio (mesmo defeito de monorepo do workflow, corrigido junto).
+#
+# ⚠️  O campo `directory` do Dependabot é relativo à **RAIZ DO REPOSITÓRIO**
+#     (não ao local deste arquivo). Como a app Rails vive em `api-ponto/`
+#     (o `Gemfile`/`Gemfile.lock` NÃO estão na raiz), o ecossistema `bundler`
+#     aponta para `/api-ponto`. O `github-actions` aponta para `/` (a raiz),
+#     onde os workflows passam a viver.
+version: 2
+updates:
+- package-ecosystem: bundler
+  directory: "/api-ponto"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
+- package-ecosystem: github-actions
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10

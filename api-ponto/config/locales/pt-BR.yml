@@ -85,6 +85,30 @@ pt-BR:
       less_than: "deve ser menor que %{count}"
       less_than_or_equal_to: "deve ser menor ou igual a %{count}"
       other_than: "deve ser diferente de %{count}"
+      # Bug 8 do Bug Finder (Sprint 29, reportado nas 3 rodadas da 29.2) —
+      # decisão do CTO em 2026-09-29 (ADR-0007): sem esta chave, `e.message` de
+      # QUALQUER `ActiveRecord::RecordInvalid` do app sai como
+      # "Translation missing: pt-BR.activerecord.errors.messages.record_invalid"
+      # — inútil para diagnóstico. O CTO promoveu a blocker da 29.3 porque é
+      # exatamente a mensagem que o operador verá quando o upsert da
+      # importação falhar. O `1 ` inicial é o "quantos erros" (convenção do
+      # Rails); `%{errors}` é a lista já formatada de `errors.full_messages`.
+      #
+      # O caminho consultado pelo `RecordInvalid` é o do FINAL do arquivo
+      # (`activerecord.errors.messages.record_invalid`) — verificá-lo aqui
+      # seria redundante. São blockscopes do mesmo arquivo.
+      record_invalid: "1 erro impediu este registro de ser salvo: %{errors}"
+      # `restrict_dependent_destroy` é irmã da mesma família pré-formatada.
+      # ACHADO 12 do Code Reviewer (2026-09-29): ela serve ao
+      # `dependent: :restrict_with_ERROR` (que passa por I18n) — NÃO ao
+      # `restrict_with_exception` usado na 29.2, cuja mensagem
+      # (`DeleteRestrictionError`) é fixa em inglês na própria gem e nunca
+      # consulta este arquivo. Mantida porque é a chave correta do namespace e
+      # evita "Translation missing" caso o app passe a usar `restrict_with_error`;
+      # o comentário anterior afirmava, errado, que a 29.2 a utilizava.
+      restrict_dependent_destroy:
+        has_one: "Não é possível apagar este registro porque existe um %{record} dependente"
+        has_many: "Não é possível apagar este registro porque existem %{record} dependentes"
   # Task 26.4 (Sprint 26) — `helpers.titles.*` portado de
   # `basic8/config/locales/pt-BR.yml` (só o bloco consumido pelo partial
   # `shared/_title`: título de ação no h1 e rótulo do botão auto-"Novo").
@@ -99,3 +123,25 @@ pt-BR:
       search: "Pesquisar"
       show: "Ver"
       update: "Editar"
+
+  # Bug 8 (Sprint 29, ADR-0007) — o `ActiveRecord::RecordInvalid` consulta
+  # ESTE caminho (não `errors.messages.record_invalid`, que é o fallback de
+  # `ActiveModel`): `activerecord.errors.messages.record_invalid`. Sem ele, a
+  # mensagem sai como "Translation missing" e o operador da importação da 29.3
+  # não vê qual validação falhou. Valor espelha o bloco `errors:` acima, para
+  # que os dois caminhos concordem independentemente de qual seja consultado.
+  activerecord:
+    errors:
+      messages:
+        record_invalid: "Validation failed: %{errors}"
+        # Achado 14 do Code Reviewer (2026-09-29) — as mensagens do invariante
+        # de auto-gerência (`InvarianteAutoGerencia`) passam por I18n em vez de
+        # string hardcoded nos models: a task que introduziu o módulo também
+        # mexeu neste arquivo por completude de i18n, então deixá-las no código
+        # seria exceção não documentada — e é a mensagem que o operador da
+        # importação da 29.3 verá.
+      models:
+        gestor_individual:
+          auto_gerencia: "não pode ser um dos geridos ativos (auto-gerência não é permitida)"
+        gestor_individual_gerenciado:
+          auto_gerencia: "não pode ser o próprio gestor (auto-gerência não é permitida)"

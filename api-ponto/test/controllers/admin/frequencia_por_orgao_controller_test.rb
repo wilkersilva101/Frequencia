@@ -13,13 +13,13 @@ module Admin
     # schema carregado (task 8.13) — stubamos os dois pontos de entrada,
     # mesmo padrão já usado em frequentadores_controller_test.rb.
     def stub_orgaos(mapa_orgao_para_cpfs)
-      Pessoas::Vinculo.define_singleton_method(:orgaos_em_uso) { mapa_orgao_para_cpfs.keys.sort }
-      Pessoas::Vinculo.define_singleton_method(:cpfs_por_orgao) { |orgao| mapa_orgao_para_cpfs[orgao] || [] }
-
-      yield
-    ensure
-      Pessoas::Vinculo.singleton_class.remove_method(:orgaos_em_uso)
-      Pessoas::Vinculo.singleton_class.remove_method(:cpfs_por_orgao)
+      # `orgaos_em_uso`/`cpfs_por_orgao` são `def self.` reais de produção —
+      # `remove_method` os apagaria para os arquivos seguintes do processo.
+      # Captura/restaura os UnboundMethod reais (inclusive sob falha).
+      com_metodos_de_classe_stubados([
+        [ Pessoas::Vinculo, :orgaos_em_uso, -> { mapa_orgao_para_cpfs.keys.sort } ],
+        [ Pessoas::Vinculo, :cpfs_por_orgao, ->(orgao) { mapa_orgao_para_cpfs[orgao] || [] } ]
+      ]) { yield }
     end
 
     test "deve funcionar com base vazia" do

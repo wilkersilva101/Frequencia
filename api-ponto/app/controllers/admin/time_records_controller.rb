@@ -1,6 +1,7 @@
 module Admin
   class TimeRecordsController < Admin::ApplicationController
     include DuracaoFormatavel
+    include FrequenciaAuthorization
 
     PER_PAGE = 50
 
@@ -17,6 +18,21 @@ module Admin
 
       # Monta a query base
       registros = TimeRecord.includes(:user).order(punched_at: :asc)
+
+      # Task 29.7 — cascata (atrás da flag). Com a flag LIGADA, um usuário
+      # NÃO-passo-2 (sem admin/role geral) vê só os registros dos
+      # frequentadores visíveis do usuário logado; quem tem visão global
+      # (admin/`visualiza_frequentadores`, passo 2) segue vendo tudo. Em
+      # shadow, a relação é observada/logada; desligada, nada muda. Como
+      # `current_user` é sempre visível para si (passo 1 da cascata), o
+      # "usuário básico vê os próprios registros" atual é preservado sob a flag.
+      observar_cascata_frequencia(registros)
+      # Task 29.8 (débito S4) — simetria shadow × on NESTA tela: o
+      # `observar_cascata_frequencia` acima só loga no modo shadow; no `:on`
+      # (o modo que efetivamente nega), a negação precisa deixar rastro. Sem
+      # isto, `time_records` logava em shadow e ficava MUDO em `:on`.
+      registrar_negacoes_frequencia(registros)
+      registros = restringir_frequencia(registros)
 
       # Usuários não-admin (basic) veem apenas os próprios registros,
       # ignorando qualquer filtro de usuário vindo dos params.

@@ -4,6 +4,10 @@ require "test_helper"
 class PessoasPessoaTest < ActiveSupport::TestCase
   include PessoasEspelhoHelper
 
+  # Débito B1: em CI/máquina limpos sem o schema do espelho, PULA em vez de
+  # explodir com PG::UndefinedTable (ver `skip_sem_espelho!`).
+  setup { skip_sem_espelho! }
+
   UserDouble = Struct.new(:cpf)
 
   test "finds a person by the normalized user CPF" do

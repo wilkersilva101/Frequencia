@@ -1,5 +1,7 @@
 module Admin
   class FrequentadoresController < Admin::ApplicationController
+    include FrequenciaAuthorization
+
     # Unidade piloto da Sprint 10B (SPRINT-PLAN.md, task 10B.1) — lotação
     # principal do usuário que conduziu a validação, 87 servidores. Expandir
     # para múltiplas unidades/todos os órgãos é escopo de sprint futura, não
@@ -22,11 +24,22 @@ module Admin
       # Task 23.7 — CanCanCan: autorização explícita para leitura.
       # Admin/gestor/operador podem visualizar.
       authorize! :read, :all
+
+      # Task 29.7 — cascata (atrás da flag). A listagem de frequentadores é a
+      # MESMA fonte do scope `frequentadores_visiveis` (29.6): com a flag
+      # LIGADA, restringe aos CPFs visíveis do usuário logado; em shadow, loga
+      # o que seria negado sem restringir; desligada, nada muda.
+      observar_cascata_frequentadores
+      # Task 29.8 (débito S4) — no modo `:on`, registra a negação EFETIVA dos
+      # frequentadores que sairão da listagem. No shadow quem loga é o
+      # `observar_*` acima; aqui é no-op.
+      registrar_negacoes_frequentadores
+
       @vinculos = Pessoas::Vinculo.frequentadores_ativos(
         nome: params[:nome],
         orgao: params[:orgao],
         categoria_trabalhador_id: params[:categoria],
-        incluir_cpfs: cpfs_exigidos_pelos_filtros_locais,
+        incluir_cpfs: incluir_cpfs_com_cascata,
         excluir_cpfs: cpfs_excluidos_pelos_filtros_locais.presence
       ).page(params[:page])
 
@@ -67,6 +80,21 @@ module Admin
     end
 
     private
+
+    # Task 29.7 — combina o filtro local (`incluir_cpfs`) com o conjunto de
+    # frequentadores visíveis (flag LIGADA). Devolve `nil` quando não há
+    # restrição alguma (flag desligada E sem filtro local), que é o contrato
+    # de "sem filtro" de `frequentadores_ativos`.
+    def incluir_cpfs_com_cascata
+      exigidos = cpfs_exigidos_pelos_filtros_locais
+      return exigidos unless frequencia_cascata_ligada?
+      # Passo 2 da cascata: quem vê todos não é restringido — evita materializar
+      # a lista inteira de vínculos para depois não filtrar nada.
+      return exigidos if frequencia_visao_global?
+
+      visiveis = frequentadores_visiveis_cpfs
+      exigidos.nil? ? visiveis : (exigidos & visiveis)
+    end
 
     # Filtro "Status" (select com status exato) restringe a lista aos cpfs
     # de Users locais naquele status; filtro "Digital: Com Digital"

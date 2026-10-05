@@ -1,7 +1,123 @@
 #!/usr/bin/env ruby
 require "rubygems"
 require "bundler/setup"
+require "stringio"
 
-ARGV.unshift("--ensure-latest")
+# `--ensure-latest` REMOVIDO (chore de pipeline, triagem do CTO 2026-09-25 /
+# lição registrada em docs/governance/lessons.md).
+#
+# O `--ensure-latest` faz o Brakeman SAIR 0 sem escanear quando a gem instalada
+# está abaixo da última publicada — que é o caso permanente neste projeto (o
+# lock fixa 8.0.5 e a publicada é 8.0.6). Efeito: o gate de segurança do CI
+# parecia verde sem nunca ter rodado ("exit 0 sozinho não prova execução").
+#
+# A versão é fixada pelo Gemfile.lock (determinística); avisar sobre versão
+# nova é trabalho de `bundle outdated`, não de um gate. Sem o flag, o scan roda
+# de verdade e o alerta de versão, se houver, aparece como aviso no relatório —
+# sem alterar o exit code.
+#
+# Flags anti-drift (ruling do CTO — M2, 2026-09-29): tornam o ledger
+# `config/brakeman.ignore` um REGISTRO DE ACEITAÇÃO auditável, não um silenciador.
+#   --ensure-ignore-notes              → exit 8 se uma entrada aceita não tiver
+#                                        `note` (a justificativa é load-bearing).
+#   --ensure-no-obsolete-ignore-entries → exit 9 se uma entrada do ledger não
+#                                        casar mais com nenhum warning (ledger
+#                                        nunca é re-congelado; rearmar o fingerprint
+#                                        é o contrato).
+# Injetadas no ARGV para que qualquer invocação (`bin/brakeman --no-pager`) já as
+# carregue. Não usamos `--no-exit-on-warn` nem `-x EOLRails` (o `Medium`
+# `Unmaintained Dependency`/EOLRails é time bomb, tratado estruturalmente).
+ANTI_DRIFT_FLAGS = %w[
+  --ensure-ignore-notes
+  --ensure-no-obsolete-ignore-entries
+].freeze
 
-load Gem.bin_path("brakeman", "brakeman")
+ANTI_DRIFT_FLAGS.each do |flag|
+  ARGV << flag unless ARGV.include?(flag)
+end
+
+# ── RR-S1 do re-review de pipeline (2026-09-29): dar SINAL aos exits 8/9 ─────
+# Por que este wrapper existe: no Brakeman 8.0.5 o `exit_on_warn` (exit 3) é
+# avaliado ANTES das duas checagens anti-drift em `Commandline#regular_report`
+# (lib/brakeman/commandline.rb:150 e :158/:163). Enquanto qualquer warning
+# NÃO-ignorado existir (hoje, o `Medium` EOLRails, time bomb do bump de Rails),
+# o processo SEMPRE sai 3 e os exits 8/9 ficam MASCARADOS: a mensagem é
+# impressa, mas o CÓDIGO de saída não os distingue. Efeito: um ledger com nota
+# vazia ou entrada obsoleta passava despercebido (a salvaguarda anti-drift
+# ficava sem sinal). Medido: com o EOLRails vivo, nota vazia → 3 (esperado 8) e
+# entrada obsoleta → 3 (esperado 9). Com o EOLRails coberto no ledger (control):
+# 8 / 9 / 0.
+#
+# Este desacoplamento NÃO remove o EOLRails do scan nem usa
+# `--no-exit-on-warn`/`-x EOLRails` (o `Medium` é tratado por bump, não
+# silenciado). Ele apenas DÁ SINAL à política: captura a saída, reemite-a
+# verbatim (nada é escondido do relatório) e, se o padrão de falha de política
+# aparecer, promove o exit ao código PRESCRITO pelo ruling (8 ou 9) — fail-safe
+# (qualquer não-zero quebra o gate) e de diagnóstico correto. Um ledger íntegro
+# não contém esses padrões e o exit real é preservado (hoje, 3, pelo EOLRails;
+# após o bump, 0).
+#
+# Detecção por linha-âncora (determinística): uma linha COMEÇANDO com o texto
+# canônico do Brakeman; um relatório de scan legítimo nunca a contém. Ecos em
+# JSON também são cobertos por substring.
+POLICY_FAILURES = {
+  8 => [
+    /^\[Error\] Notes required for all ignored warnings/,
+    "Notes required for all ignored warnings"
+  ],
+  9 => [
+    /^== Obsolete Ignore Entries ==/,
+    "Obsolete ignore entries were found"
+  ]
+}.freeze
+
+def policy_failure_code(output)
+  POLICY_FAILURES.each do |code, (anchor, echo)|
+    return code if output.each_line.any? { |line| line.match?(anchor) } || output.include?(echo)
+  end
+  nil
+end
+
+require "brakeman"
+require "brakeman/commandline"
+
+captured = StringIO.new
+real_exit = 0
+orig_stdout = $stdout
+orig_stderr = $stderr
+$stdout = captured
+$stderr = captured
+
+begin
+  begin
+    Brakeman::Commandline.start
+    real_exit = 0
+  rescue SystemExit => e
+    real_exit = e.status
+  rescue StandardError => e
+    # Fail-safe: qualquer crash do Brakeman (ex.: o `NoMethodError` do RE-M2.1
+    # quando a chave `note` está AUSENTE em vez de vazia) preserva exit não-zero
+    # e o diagnóstico, em vez de virar verde.
+    real_exit = 1
+    captured.puts "\n[bin/brakeman] erro inesperado: #{e.class}: #{e.message}"
+    captured.puts e.backtrace.first(15)
+  end
+ensure
+  $stdout = orig_stdout
+  $stderr = orig_stderr
+end
+
+output = captured.string
+
+# Repassa a saída intacta (o relatório continua visível no log do CI).
+$stdout.write(output) unless output.empty?
+
+# Dá sinal à política anti-drift: o código prescrito (8/9) tem precedência sobre
+# o exit 3 mascarado pelo `exit_on_warn`.
+policy_code = policy_failure_code(output)
+if policy_code
+  $stderr.puts "[bin/brakeman] RR-S1: sinal de política anti-drift detectado → exit #{policy_code} " \
+               "(o exit #{real_exit} do Brakeman é mascarado pelo `exit_on_warn` enquanto houver warning não-ignorado)."
+end
+
+exit(policy_code || real_exit)

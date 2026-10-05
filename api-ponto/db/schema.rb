@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_09_10_185008) do
+ActiveRecord::Schema[8.0].define(version: 2026_09_29_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -59,26 +59,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_10_185008) do
     t.index ["estacao_ponto_id"], name: "index_estacao_pings_on_estacao_ponto_id"
   end
 
-  create_table "calculo_diarios", force: :cascade do |t|
-    t.bigint "user_id", null: false
-    t.date "data", null: false
-    t.integer "normal_segundos"
-    t.integer "excepcional_segundos"
-    t.integer "total_segundos"
-    t.integer "meta_segundos"
-    t.boolean "aberto", default: false, null: false
-    t.boolean "ausencia", default: false, null: false
-    t.boolean "falta", default: false, null: false
-    t.boolean "falta_a_descontar", default: false, null: false
-    t.boolean "falta_compensada", default: false, null: false
-    t.boolean "descontado_em_folha", default: false, null: false
-    t.string "informacao"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["user_id", "data"], name: "index_calculo_diarios_on_user_id_and_data", unique: true
-    t.index ["user_id"], name: "index_calculo_diarios_on_user_id"
-  end
-
   create_table "estacoes_ponto", force: :cascade do |t|
     t.string "descricao", null: false
     t.string "versao"
@@ -122,7 +102,12 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_10_185008) do
     t.bigint "user_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "id_legado"
+    t.boolean "ativo", default: true, null: false
+    t.datetime "data_exclusao"
+    t.index ["gestor_individual_id", "user_id"], name: "index_gestor_individual_gerenciados_on_par_ativo", unique: true, where: "ativo"
     t.index ["gestor_individual_id"], name: "index_gestor_individual_gerenciados_on_gestor_individual_id"
+    t.index ["id_legado"], name: "index_gestor_individual_gerenciados_on_id_legado", unique: true
     t.index ["user_id"], name: "index_gestor_individual_gerenciados_on_user_id"
   end
 
@@ -131,6 +116,15 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_10_185008) do
     t.string "orgao"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "id_legado"
+    t.string "gestor_cpf"
+    t.text "observacao"
+    t.boolean "ativo", default: true, null: false
+    t.datetime "data_exclusao"
+    t.datetime "data_criacao_legado"
+    t.bigint "gestor_user_id"
+    t.index ["gestor_user_id"], name: "index_gestores_individuais_on_gestor_user_id"
+    t.index ["id_legado"], name: "index_gestores_individuais_on_id_legado", unique: true
   end
 
   create_table "intervencao_frequencias", force: :cascade do |t|
@@ -364,9 +358,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_10_185008) do
 
   add_foreign_key "calculo_diarios", "users"
   add_foreign_key "estacao_pings", "estacoes_ponto", column: "estacao_ponto_id"
-  add_foreign_key "calculo_diarios", "users"
   add_foreign_key "gestor_individual_gerenciados", "gestores_individuais", column: "gestor_individual_id"
   add_foreign_key "gestor_individual_gerenciados", "users"
+  add_foreign_key "gestores_individuais", "users", column: "gestor_user_id"
   add_foreign_key "intervencao_frequencias", "time_records"
   add_foreign_key "intervencao_frequencias", "users"
   add_foreign_key "intervencao_frequencias", "users", column: "resolvido_por_id"

@@ -1,44 +1,37 @@
 # _context.md — progress
-> Gerado em: 2026-09-25 | Fontes: iteration_23.md, iteration_24.md, iteration_26.md, iteration_29.md, adr/0006-schema-teste-espelho-pessoas.md | Palavras: ~680
-> Atualizar quando: nova iteration criada; status de tarefa alterado; correções de review registradas; sprint concluída.
+> Gerado em: 2026-10-05 | Fontes: iteration_29.md, quality/review_report_29_4..29_8.md, adr/0006-0008, iteration_chore_*.md, iteration_23/24/26.md | Palavras: ~720
+> Atualizar quando: nova iteration criada; status de tarefa alterado; sprint concluída; push/MR; baseline da suíte remedido.
 
 ## O que esta pasta contém
-Acompanha as sprints do Frequência, com um `iteration_N.md` por sprint. A Sprint 23 foi encerrada, a Sprint 24 foi concluída, a Sprint 26 está consolidada e aguarda revisão, e a Sprint 29 é a sprint ativa de autorização/cascata de frequência; a Tarefa 29.1 foi aprovada por Code Reviewer e Bug Finder e aguarda commit manual.
+Acompanha as sprints do Frequência, com um `iteration_N.md` por sprint. Sprints 23/24 encerradas; 26 consolidada; **29 é a sprint ativa e está COMPLETA** (29.0 a 29.8 entregues, aprovadas e commitadas). As chores transversais têm arquivo próprio (`iteration_chore_*.md`).
 
 ## Pontos-chave para agentes
-### iteration_23.md
-- Sprint Devise + CanCanCan + Rolify concluída; o ciclo de bug-hunting do `POST /u/password` foi encerrado.
-- A correção de timing side-channel foi mantida pelo CTO, com paridade 5=5 queries e sem mutação de dados.
-- Débitos e gatilhos de reabertura do ActionMailer permanecem registrados na própria iteration.
+### iteration_29.md — Sprint 29 (cascata de autorização de frequência) ✅ CONCLUÍDA
+- **Entrega:** substitui o baseline "todo autenticado lê tudo" (23.7) pela cascata do legado — PORO `AutorizacaoFrequencia`/29.4 (5 passos + `motivo`, fail-closed), scope SQL `FrequentadoresVisiveis`/29.6 (equivalente item a item, sem N+1), PORO `ElegibilidadeDesconsideracao`/29.5 (gate **só do passo 5** — D5), integração na `Ability` + 6 controllers/29.7 e matriz/auditoria/29.8.
+- **Flag `FREQUENCIA_AUTORIZACAO_CASCATA`** (`:off`/`:shadow`/`:on`, default **OFF**): `:on` restringe e loga negações; `:shadow` só loga; `:off` = comportamento idêntico ao atual. Preserva a visão global (admin / `visualiza_frequentadores`).
+- **Rulings do CTO:** D1 (roles `visualiza_frequentadores`/`visualiza_terceirizados` — a de terceirizados só é significativa combinada); D4 (TERCEIRIZADO = `Vinculo#tipo_vinculo.nome == "Terceirizado"`); D5 (desconsiderar = **apenas** hierarquia/passo 5; `GestorIndividual` vê mas não desconsidera); D6 (unidade inelegível não libera, ausente não interrompe, path corrompido fail-closed); D8 (nunca `valid?` no caminho de leitura). ADR-0008 = semântica de `ativo` do gestor (**projeção**: `true` sse ≥1 vínculo ativo).
+- **Débitos abertos:** 🟡 **S2** (twin SQL `geridos_user_ids` × PORO passo 4/GI inativo — a matriz é cega ao PORO; mutar `.ativos` do PORO não derruba teste de listagem) e 🟡 **S3** (`frequencia_por_orgao` fora do grão da matriz). Ambos com dono Sprint 30/chore e gatilho binário.
 
-### iteration_24.md
-- Sprint basic8 concluída: `zutils`, `simple_form`, `ransack` e `pagy` foram integrados sem alteração de banco ou autenticação.
-- `kaminari` foi preservado; `ransackable_*` permanece fora do escopo desta sprint.
+### iteration_chore_*.md
+- **Stubs destrutivos** (`auditoria_stubs_destrutivos`): causa-raiz do 13º erro — `remove_method` do scope real `Pessoas::Vinculo.ativos` em `dashboard_controller_test.rb` vazava por processo; corrigido em `eb38b1e`; auditoria achou **8 arquivos vazando** (`43b7d84`); blindagens locais removidas (`166f51d`). Padronização de helper e cop anti-`remove_method` ficaram agendados (gatilho = tocar os arquivos).
+- **`debitos_pre_29_7`**: 3 débitos fechados em `16c1c9a`.
+- **`gitlab-ci`**: monorepo (raiz git = `Frequencia/`, app em `api-ponto/`) exige `.gitlab-ci.yml` na **raiz**; pipeline criado mas **bloqueado por infra — nenhum runner online**, o job `test` nunca rodou em runner real. **Não declarar concluída.**
+- **`github-workflows`** e **`stub_nao_destrutivo`**: chores correlatas de esteira/teste.
 
-### iteration_26.md
-- As tarefas 26.1–26.10 foram consolidadas no commit `1a73a4d`, com estilo basic8 e assets/build.
-- A validação consolidada foi registrada como pendente de Code Reviewer/Bug Finder e verificação visual manual.
-
-### iteration_29.md
-- A Tarefa 29.1 expõe no espelho Pessoas os três gestores, `#gestor?`, `#cadeia_ascendente` e `Pessoas::Pessoa.por_user`, preservando `PessoasRecord#readonly?` e sem nova gem.
-- Os achados HIGH-1/HIGH-2/LOW-1 foram fechados por mutation testing: path de ancestry com auto-referência é rejeitado sem consulta, `foreign_key`/`active_record_primary_key` das três associations e igualdade de gestores.
-- Tarefa 29.0 (ADR-0006, ✅ implementada, aguardando Code Reviewer) (ADR-0006): schema mínimo do Pessoas2 carregado no `frequencia_pessoas_espelho_test` por rake com guardas; pré-requisito da 29.4 e da 29.6 (testes de SQL, propriedade e contagem de queries não podem depender só de stubs). O banco de teste do espelho foi renomeado de `pessoas_test` (colidia com o banco de teste do Pessoas2) para `frequencia_pessoas_espelho_test`. Setup por máquina/CI: `createdb -O app.frequencia frequencia_pessoas_espelho_test` e depois `RAILS_ENV=test bin/rails test:pessoas_schema:load`. Helpers em `test/support/pessoas_espelho_helper.rb`.
-- Regra D6 (29.4): cadeia sobe inteira; unidade inativa/extinta não libera acesso pelos seus gestores; ancestral ausente é pulado com log; path corrompido segue fail-closed (inclui Bugs 1/2 do Bug Finder).
-- As tarefas 29.2–29.8 permanecem pendentes; D1–D4 continuam decisões bloqueantes para migration e autorização.
+### iteration_23.md / 24.md / 26.md
+- 23: Devise + CanCanCan + Rolify (origem do baseline `can :read, :all`). 24: basic8. 26: 26.1–26.10 no commit `1a73a4d`.
 
 ## Estado atual
-- Sprint 29 ativa; Tarefa 29.1 ✅ aprovada (Review 0 blockers; Bug Finder 0 crítico/alto/médio), liberada para commit manual com stage seletivo (nunca `git add -A`; logs e `tmp/cache` rastreados não entram).
-- Merge da 23.7 (CanCanCan nos controllers) segue pendente: é pré-condição da 29.7, que altera a `Ability`.
-- Testes direcionados: 13 runs / 53 assertions / 0 failures; suíte completa: 793 runs / 2886 assertions / 1 falha baseline de timezone em `presenca_endpoints_test.rb:187`, não atribuída à 29.1.
-- RuboCop dos quatro arquivos alterados: 0 offenses; RuboCop completo: 60 offenses preexistentes; Zeitwerk e `bundle check` OK.
-- **Brakeman:** `bin/brakeman` NÃO executa scan (binstub força `--ensure-latest` com gem defasada) — não registrar "Brakeman OK" com base nele. Scan real (`RUBYOPT= bundle exec brakeman`): 4 warnings pré-existentes, 0 na 29.1. Correção do gate fica em chore agile de pipeline.
-- Branch `feature/demanda-29-correcoes-review`; nenhuma alteração de banco, autenticação ou autorização foi feita; 29.2/29.4/29.7 dependem das decisões D1–D4.
+- Branch `integration/sprint-29` @ **`e795df9`**, **publicada no GitLab**. Sprint 29 fechada; sem pendência de commit.
+- Commits da sprint: `0f1fdfd` (29.4), `29f719c` (29.6), `2b8e47a` (29.5), `16c1c9a` (débitos pré-29.7), `df57cf5` (29.7), `e795df9` (29.8); stubs `eb38b1e`/`43b7d84`/`166f51d`.
+- **Baseline da suíte: 1083 runs / 3789 assertions / 1 failure + 11 errors / 0 skip.** As 12 são pré-existentes: 11× Devise `redirect_to` (`Users::SessionsControllerTest`/`PasswordsControllerTest`) + 1× timezone em `PresencaEndpointsTest`. Espelho Pessoas: 19/68/0/0.
+- Próximo: **Sprint 30** (cascata/roles granulares + débitos S2/S3). Merge da 23.7 antes avaliado segue como débito.
+- Dívidas de CI com dono/gatilho binário: bump Rails ≥8.1.x (`chore/bump-rails-8.1`, gatilho brakeman EXIT=0); 77 offenses RuboCop (`chore/limpeza-rubocop-77`, gatilho rubocop EXIT=0). Ambiente medido: Ruby **3.3.8** / Rails **8.0.5** → ver `governance/_context.md`.
 
 ## Referências para aprofundamento
-- Para a Tarefa 29.1, critérios, achados e validações → `docs/progress/iteration_29.md`
-- Para a estratégia de schema de teste do espelho → `docs/adr/0006-schema-teste-espelho-pessoas.md`
-- Para o estado da Sprint 26 → `docs/progress/iteration_26.md`
-- Para o ciclo Devise/Rolify e débitos de segurança → `docs/progress/iteration_23.md`
-- Para as gems e wiring da Sprint 24 → `docs/progress/iteration_24.md`
-- Para as lições operacionais → `docs/governance/lessons.md`
-- Para as regras e configurações → `/home/davi.queiroz/Área de trabalho/workspace_integração/AGENTS.md`
+- Estado/tarefas 29.0–29.8, rulings do CTO e baseline canônico → `docs/progress/iteration_29.md`
+- Reviews 29.4/29.5/29.6/29.7/29.8 → `docs/quality/review_report_29_4.md` · `29_5` · `29_6` · `29_7` · `29_8`
+- Bloco de esteira/CI → `docs/progress/iteration_chore_gitlab-ci.md`
+- Stubs destrutivos → `docs/progress/iteration_chore_auditoria_stubs_destrutivos.md`
+- ADRs 0006/0007/0008 → `docs/adr/0006-schema-teste-espelho-pessoas.md` · `0007-soft-delete-gestor-individual-e-politica-delecao-usuario.md` · `0008-semantica-estado-gestor-individual-e-identidade-legado.md`
+- Regras e lições → `docs/governance/_context.md` e `docs/governance/lessons.md`

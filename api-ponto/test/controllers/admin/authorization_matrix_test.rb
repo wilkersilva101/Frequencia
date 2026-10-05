@@ -89,10 +89,10 @@ module Admin
     # aceitar os argumentos nomeados que o Admin::UsersController#index passa.
     def stub_frequentadores_ativos
       paginado = Kaminari.paginate_array([]).page(1)
-      Pessoas::Vinculo.define_singleton_method(:frequentadores_ativos) { |**_kwargs| paginado }
-      yield
-    ensure
-      Pessoas::Vinculo.singleton_class.remove_method(:frequentadores_ativos)
+      # `def self.frequentadores_ativos` é método real de produção — remove_method
+      # o apagaria para os arquivos seguintes do mesmo processo (ver lição em
+      # docs/governance/lessons.md). Captura/restaura o UnboundMethod real.
+      com_metodo_de_classe_stubado(Pessoas::Vinculo, :frequentadores_ativos, ->(**_kwargs) { paginado }) { yield }
     end
 
     # ----------------------------------------------------------------------

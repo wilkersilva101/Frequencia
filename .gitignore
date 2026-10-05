@@ -21,6 +21,15 @@ api-ponto/config/master.key
 api-ponto/config/credentials/*.key
 api-ponto/config/credentials/*.pem
 
+# Achado 4 do Code Reviewer (2026-09-29) — credenciais na RAIZ do repositório.
+# O bloco acima só cobria `api-ponto/config/`; a raiz carregava `master.key` e
+# `credentials.yml.enc` sem ignore (`git check-ignore --no-index` retornava
+# exit=1), e ambos estavam untracked — um `git add -A` commitaria a chave-mestra
+# da máquina junto com o blob de credenciais descriptografável por ela.
+/master.key
+/credentials.yml.enc
+/config/master.key
+
 # Rails secrets
 api-ponto/.env
 api-ponto/.env.local
@@ -35,3 +44,6 @@ api-ponto/.env.development
 # OS
 Thumbs.db
 api-ponto/.bundle/
+
+# AI Workflow (symlinks locais para o repo ai-workflow — caminhos absolutos da máquina)
+.claude/

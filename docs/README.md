@@ -52,7 +52,7 @@
 | `09-intranet/` | **Fases 1–2** | **Intranet legada** — módulo `presenca`, fluxos A–D, DUVs | [`00-indice-modulo-presenca.md`](09-intranet/00-indice-modulo-presenca.md) |
 | `02-arquitetura/` | **Fase 4** | Arquitetura do novo sistema — **a preencher** (após PRD) | *(vazia)* |
 | `10-testes/` / `11-deploy/` | **Fases 8/9** | Testes e implantação — a preencher | *(vazias)* |
-| `adr/` | Decisões | Architecture Decision Records | [ADRs `0000`–`0005`](adr/) |
+| `adr/` | Decisões | Architecture Decision Records | [ADRs `0000`–`0009`](adr/) |
 | `specs/` | — | Memória/estado da sessão (Spec-Driven) | `STATE.md` |
 | `duvidas/` | — | Rastreamento de dúvidas (resolvidas e realocadas) | `README.md` |
 
