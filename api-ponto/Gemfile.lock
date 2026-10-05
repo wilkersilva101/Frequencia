@@ -212,7 +212,10 @@ GEM
       racc (~> 1.4)
     orm_adapter (0.5.0)
     ostruct (0.6.3)
-    pagy (9.4.0)
+    pagy (43.6.3)
+      json
+      uri
+      yaml
     parallel (2.1.0)
     parser (3.3.12.0)
       ast (~> 2.4.1)
@@ -380,6 +383,7 @@ GEM
       base64
       websocket-extensions (>= 0.1.0)
     websocket-extensions (0.1.5)
+    yaml (0.4.0)
     zeitwerk (2.8.3)
     zutils (4.0.0)
       rails (>= 7.0)
@@ -409,7 +413,7 @@ DEPENDENCIES
   kamal
   kaminari
   mysql2 (~> 0.5.7)
-  pagy (~> 9)
+  pagy (~> 43)
   pg (~> 1.1)
   propshaft
   puma (>= 5.0)
