@@ -64,7 +64,7 @@ gem "pagy", "~> 9"
 # na Sprint 25 — RN04).
 gem "zutils", "~> 4.0"
 gem "simple_form", "~> 5.4"
-gem "ransack", "~> 4.4"
+gem "ransack", "~> 5.0"
 
 # Sprint 26, task 26.6 — Breadcrumbs do admin (RNF05): trilho de navegação
 # renderizado pelo partial `shared/_title` (task 26.4). Mesma gem do basic8
