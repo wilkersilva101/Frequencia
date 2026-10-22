@@ -54,7 +54,7 @@ gem "kaminari"
 # Adotada nos scaffolds admin via `@pagy, @collection = pagy(...)`. O
 # kaminari permanece no bundle até a Sprint 28 (RF10), quando será
 # removido em favor do pagy como dependência única.
-gem "pagy", "~> 9"
+gem "pagy", "~> 43"
 
 # Sprint 24, task 24.1 — Scaffold padrão do basic8 (RF01/RF02, D1/D2).
 # zutils: engine dos partials `shared/*` (search_form, index, form, show)
